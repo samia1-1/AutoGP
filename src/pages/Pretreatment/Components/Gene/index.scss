@@ -1,0 +1,29 @@
+.preGene {
+  text-align: center;
+
+  .title {
+    font-weight: bold;
+    font-size: 3.5vh;
+    color: rgb(91, 91, 94);
+    padding: 6vh;
+  }
+  .main{
+    padding:4vh 2vw;
+    height:10vh;
+    // text-align: left;
+    div{
+      display: inline-block;
+    }
+    .label{
+      font-size: 2.2vh;
+    }
+    .submit{
+      margin:0 3vw;
+    }
+  }
+  .content{
+    font-size: 2.3vh;
+    padding: 0 10vw;
+    line-height: 1.7;
+  }
+}

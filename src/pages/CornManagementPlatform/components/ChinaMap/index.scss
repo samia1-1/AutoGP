@@ -1,0 +1,12 @@
+.china_map {
+  box-sizing: border-box;
+  .mao{
+    
+    width: '100vw';
+    height: '90vh';
+    // backgroundColor: '#f0f0f0', // 设置适当的背景色
+    display: 'flex';
+    justify-content: 'center';
+    align-items: 'center';
+  }
+}

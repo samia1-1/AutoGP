@@ -1,0 +1,49 @@
+.personal {
+  // background: linear-gradient(to bottom, rgb(242, 242, 242), #ffffff);
+  background-color: white;
+
+  .title {
+    font-size: 2.2vw;
+    // font-weight: bold;
+    margin: 2vw auto;
+    display: inline-block;
+  }
+  .main {
+    margin: 0 auto;
+    text-align: center;
+
+    .info {
+      text-align: left;
+      padding: 0 10vw;
+      padding-top: 5vh;
+      background: linear-gradient(to bottom, rgb(242, 242, 242), #ffffff);
+
+      .data-personal{
+        // text-align: center;
+        .title{
+          font-size: 1.5vw;
+        }
+      }
+      .data {
+        margin: 2vw auto;
+      }
+      .ant-descriptions{
+        padding: 0;
+      }
+    }
+
+
+    .Link {
+      text-decoration: none;
+      color: black;
+      margin-left: 4vw;
+      display: block;
+      text-align: right;
+    }
+    .data{
+      margin:10vh 0;
+      padding:2vh 10vw;
+      background: linear-gradient(to bottom, rgb(242, 242, 242), #ffffff);
+    }
+  }
+}

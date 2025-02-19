@@ -1,0 +1,31 @@
+.anal_group{
+  width: 80vw;
+  height: 90vh;
+  .title{
+    text-align: center;
+    font-size: 4.5vh;
+    color: rgb(91, 91, 94);
+    padding:6vh;
+    font-weight: bold;
+  }
+  
+  .func {
+    background-color: white;
+    padding: 20px;
+    width: 60vw;
+    border-radius: 10px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    margin: 0 auto;
+
+    box-shadow:
+      0 12px 24px rgba(0, 0, 0, 0.3),
+      /* 右侧和下方的阴影 */
+      -3px -3px 10px rgba(255, 255, 255, 0.7);
+    /* 左上角的光泽效果，模拟边缘 */
+
+    margin-top: 10vh;
+    .P-func-item {
+      margin-bottom: 20px;
+    }
+  }
+}

@@ -1,0 +1,95 @@
+.Login {
+  background-image: linear-gradient(rgba(0, 0, 0, .4), rgba(0, 0, 0, .5)), url('@/assets/login/mountain.gif');
+  background-size: 100% 100%;
+  width: 100vw;
+  height: 100vh;
+  background-size: cover;
+  background-position: center;
+  opacity: 0.85;
+
+  .main {
+    display: flex;
+    flex-direction: column;
+    /* 垂直排列 */
+    justify-content: center;
+    /* 垂直居中对齐 */
+    align-items: center;
+    /* 水平居中对齐 */
+    color: white;
+
+    .title {
+      margin: 7vh;
+      font-size: 4vw;
+      font-weight: bold;
+      text-align: center;
+    }
+
+    .content {
+      font-size: 1.2vw;
+      width: 70vw;
+      text-align: center;
+    }
+
+    .login {
+      width: 30vw;
+      padding: 1.5vw;
+      background-color: rgba(194, 194, 194, .4);
+      border-radius: 8px;
+      margin-top: 4vh;
+      margin-bottom: 2vh;
+
+      label {
+        font-size: 2vh !important;
+        color: rgb(237, 235, 235) !important;
+      }
+
+      .ant-form {
+        width: 100%;
+      }
+
+      .ant-form-item {
+        margin-bottom: 1.5vh;
+
+        .ant-form-item-label {
+          text-align: center;
+        }
+      }
+
+      .ant-input {
+        color: rgb(0, 0, 0);
+        /* 设置输入框的字体颜色为白色 */
+        width: 100%;
+        opacity: 0.5;
+        /* 设置输入框的透明度为 0.8 */
+      }
+
+      .ant-input-password {
+        width: 100%;
+        opacity: 0.5;
+        /* 设置密码框的透明度为 0.8 */
+      }
+
+      .ant-form-item-control-input {
+        max-width: 20vw;
+      }
+
+      .ant-btn {
+        width: 100%;
+        display: flex;
+        justify-content: center;
+        /* 让 Submit 按钮居中 */
+        font-size: 18px;
+        /* 增大 Submit 按钮字体 */
+      }
+    }
+  }
+
+  .test {
+    padding: 3vh 0;
+
+    div {
+      padding: 0.5vh;
+      color: yellow;
+    }
+  }
+}
