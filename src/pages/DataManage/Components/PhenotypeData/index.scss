@@ -1,0 +1,70 @@
+.manPhenotype {
+    width: 90vw;
+    text-align: center;
+  .title {
+    font-size: 3.5vh;
+    color: rgb(91, 91, 94);
+    padding: 6vh;
+  }
+
+  .upload {
+    
+    text-align: left;
+    margin-bottom: 5vh;
+    margin-left: 10vw;
+
+  }
+
+  .res {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 50px;
+  }
+
+  .phenotype-item {
+    width: 250px;
+    padding: 16px;
+    background-color: #fff;
+    border: 1px solid #f0f0f0;
+    border-radius: 8px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    text-align: center;
+    transition: transform 0.3s, box-shadow 0.3s;
+
+    &:hover {
+      transform: translateY(-15px);
+      box-shadow: 0 6px 12px rgba(0, 0, 0, 0.2);
+    }
+
+    video {
+      width: 100%;
+      height: auto;
+      border-radius: 10px;
+      margin-bottom: 20px;
+    }
+
+    .ant-spin {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 5vw;
+    }
+
+    .plantName {
+      font-size: 16px;
+      font-weight: 500;
+      color: #333;
+      margin-top: 10px;
+    }
+  }
+
+  
+  // 分页条样式
+  .ant-pagination {
+    display: flex;
+    justify-content: flex-end; // 右对齐
+    margin:10vh 5vw; // 与内容区域分隔
+    padding-top:5vh;
+  }
+}

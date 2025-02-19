@@ -1,0 +1,47 @@
+.corn_platform {
+  text-align: center;
+  margin: 0 auto;
+  margin-top: 3vh;
+
+  .province_title {
+    font-size: 1.3vw;
+    margin: 4vh 3vh;
+    text-align: left;
+
+    div {
+      display: inline;
+    }
+
+    .province_item {
+      background-color: #FAFAFA;
+      // padding:7px 15px;
+      padding: 0.6vh 1vw;
+      border-radius: 5px;
+    }
+
+    .back {
+      color: #FAFAFA;
+      font-size: 15px;
+      padding: 0.6vh 1vw;
+      cursor: pointer;
+    }
+
+    .back:hover {
+      color: #ff6347;
+    }
+  }
+
+  .corn_table {
+    margin-top: 3vh;
+    width: 90vw;
+    // height: 90vh;
+    box-sizing: border-box;
+    box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.1);
+    border-radius: 8px;
+  }
+  .table_item{
+    background-color: white;
+    border-radius: 15px;
+    margin-bottom: 5vh;
+  }
+}

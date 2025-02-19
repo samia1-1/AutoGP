@@ -1,0 +1,106 @@
+
+
+.result_in {
+  .content {
+    width: 80%;
+    margin: 0 auto;
+    font-size: 2.2vh;
+    padding: 5vh 0;
+    line-height: 1.5;
+  }
+
+  margin-top:7vh;
+  // 给可视化图新添加背景图
+  .in {
+    margin-bottom: 2vh;
+    margin-left: 5%;
+    text-align: left;
+  }
+  .result {
+    background-image: url('/assets/imgs/obj/obj1.jpg'); 
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    width: 90%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    margin: 0 auto;
+    border-radius: 10px;
+    display: flex;
+    height: 95vh;
+    position: relative;
+
+    .init {
+      padding:30px 0;
+      div {
+        margin: 10px 0;
+      }
+    }
+
+    .left {
+      width: 25%;
+      margin: 1vh 1vw;
+      box-sizing: border-box;
+      // background-color: rgba(218, 227, 245,1);
+      background-color: rgba(255, 255, 255, .5);
+      font-size: 2.2vh;
+      // height: 90%;
+
+      Button {
+        margin-bottom:20px;
+      }
+      .before{
+        margin:10px;
+      text-align: left;
+      }
+      .before:hover{
+        cursor: pointer;
+        color:red;
+      }
+
+    }
+    .point{
+      
+      .box {
+        margin: 0 auto;
+        margin: 8%;
+        // background-color: aliceblue;
+        background-color: rgba(240, 248, 255, 1);
+        padding: 4%;
+        border: 1px solid rgb(180, 180, 180);
+      }
+
+      .box1 {
+        background-color: rgb(222, 232, 240);
+      }
+    }
+
+    .rotate_button{
+      position: absolute; // 使按钮绝对定位
+      top: 50%; // 垂直居中
+      transform: translateY(-50%); // 向上移动一半高度，使其真正居中
+      z-index: 10; // 确保按钮在其他元素之上
+      Button{
+        width:40px;
+        height:40px;
+        border-radius: 50%;
+        font-weight: bold;
+      }
+    }
+    .button_1{
+      left: 35%;
+    }
+    .button_2{
+      right: 5%;
+    }
+    .canvas-container {
+      width: 70%;
+      height: 100%;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+  }
+}

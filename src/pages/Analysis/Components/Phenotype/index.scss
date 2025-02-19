@@ -1,0 +1,108 @@
+.phenotype{
+  width: 80vw;
+  height: 90vh;
+  margin:0 auto;
+  text-align: center;
+  .title{
+    font-size: 4.5vh;
+    color: rgb(91, 91, 94);
+    padding:6vh;
+    font-weight: bold;
+  }
+  .content{
+    font-size: 2.3vh;
+    padding:3vh;
+    padding-bottom: 5vh;
+    line-height: 1.5;
+  }
+  .middle{
+    div{
+      display: inline-block;
+      padding:2vh;
+    }
+  }
+  
+  .func {
+    background-color: white;
+    padding: 20px;
+    width: 60vw;
+    border-radius: 10px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    margin: 0 auto;
+
+    margin-top: 4vh;
+    box-shadow:
+      0 12px 24px rgba(0, 0, 0, 0.3),
+      /* 右侧和下方的阴影 */
+      -3px -3px 10px rgba(255, 255, 255, 0.7);
+    /* 左上角的光泽效果，模拟边缘 */
+
+    .P-func-item {
+      margin-bottom: 20px;
+    }
+  }
+  .img{
+    bottom: 0;
+    display: flex;
+    justify-content: space-around; // 根据需要调整对齐方式
+    align-items: center; // 垂直居中
+    flex-wrap: wrap; // 允许换行
+    img{
+      // padding:0 0.2vw;
+      width: 18vw;
+      height: 20vw;
+    }
+  }
+
+  // 使得图片和原数据左右排列
+  .res {
+    margin-top:10vh;
+    display: flex;
+    justify-content: space-between; // 如果需要均匀分布左右两侧内容
+    align-items: flex-start; // 如果内容高度不同，可以对齐顶部
+
+    .left {
+      flex: 1; // 左侧占据的宽度比例
+      margin-right: 20px; // 添加右边距，避免与右侧内容贴在一起
+    }
+
+    .source_data {
+      flex: 1; // 右侧占据的宽度比例
+      margin-left: 20px; // 添加左边距，避免与左侧内容贴在一起
+    }
+  }
+  // 为原数据添加深色背景
+  .phenotype-table {
+    background-color: #e9e5e5; // 设置深色背景
+  
+    .ant-table-thead > tr > th {
+      background-color: #c8c5c5; // 表头背景颜色
+    }
+  
+    .ant-table-tbody > tr > td {
+      background-color: #f6f3f3; // 表格内容的背景颜色
+    }
+  
+    .ant-pagination-item,
+    .ant-pagination-prev,
+    .ant-pagination-next {
+      background-color: #eae7e7; // 分页器背景颜色
+      border-color: #141414; // 分页器边框颜色
+    }
+  
+    .ant-pagination-item-active {
+      background-color: #bab8b8; // 分页器选中项的背景颜色
+      border-color: #979595; // 分页器选中项的边框颜色
+    }
+  
+    .ant-pagination-item:hover,
+    .ant-pagination-prev:hover,
+    .ant-pagination-next:hover {
+      background-color: #8b8989; // 鼠标悬停时的背景颜色
+    }
+  }
+  .btn{
+  padding:2vh;
+  padding-bottom: 5vh;
+  }
+}

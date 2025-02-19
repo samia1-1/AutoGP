@@ -1,0 +1,12 @@
+.analysis {
+  display: flex;
+  .OutletContainer {
+    display: flex;
+    flex-direction: column;
+    align-items: center; // 水平居中
+    // justify-content: center; // 垂直居中
+    width: 100%; // 占满可用宽度
+    // height: 100vh;
+    background: linear-gradient(to bottom, rgb(242, 242, 242), #ffffff);
+  }
+}

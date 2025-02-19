@@ -1,0 +1,19 @@
+.mainApp {
+  // display: flex;
+  // justify-content: flex-end;
+  // align-items: center;
+  width: 100%;
+
+  .right {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 3vh;
+    height: 8vh;
+    font-weight: bold;
+    background: inherit;
+    /* 继承背景 */
+  }
+
+  // background-color: rgb(232, 239, 242);
+}

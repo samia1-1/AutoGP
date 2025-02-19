@@ -1,0 +1,37 @@
+.Communicate {
+  // background-image: url(@/assets/img/comment.jpg);
+  // background-attachment: fixed;
+  // background-size: cover;
+  // background-position: center;
+  // display: flex;
+  // flex-direction: column;
+  // align-items: center;
+  // justify-content: flex-start;
+  background: linear-gradient(to bottom,rgb(242, 242, 242), #ffffff);
+  .main{
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    height: 100%; 
+    width: 90%;
+    .publish {
+      background-color: white;
+      padding: 3vh;
+      position: sticky;
+      bottom: 0;
+      align-items: center;
+      // box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.1);
+      label{
+        font-size: 3vh;
+      }
+      Input,
+      Button {
+        font-size: 2vh; 
+        display: inline;
+      }
+      Input{
+        width: 65vw;
+      }
+    }
+  }
+}
