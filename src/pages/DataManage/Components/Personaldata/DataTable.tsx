@@ -1,4 +1,3 @@
-
 import { Table, Button } from 'antd';
 import { useTranslation } from 'react-i18next';
 import './style.scss'
@@ -8,7 +7,7 @@ const DataTable = ({ dataKey, records, onDownload, onDelete }) => {
 
   let filteredRecords = records;
   if (dataKey === 'personal' && records.length > 2) {
-    filteredRecords = records.slice(0, 5);  // 只取前两条记录
+    filteredRecords = records.slice(0, 5);  // 只取前五条记录
   }
 
   // 分页设置

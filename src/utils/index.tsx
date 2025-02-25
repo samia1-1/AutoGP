@@ -7,6 +7,7 @@ export * from './file'
 export * from './requireAuth'
 export * from './token'
 export * from './user'
+export * from './cryptoHybrid'
 
 export {
   request,
