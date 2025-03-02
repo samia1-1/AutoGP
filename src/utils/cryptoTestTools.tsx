@@ -69,6 +69,96 @@ export const CryptoTestTools = {
       console.error('❌ 测试过程中出错:', error);
       return { success: false, error };
     }
+  },
+
+  // 添加一个特殊测试函数，演示请求级密钥管理
+  testRequestKeyManagement: async () => {
+    console.group('🔑 测试请求级密钥管理');
+    console.log('模拟多个并发请求，每个请求使用独立密钥');
+    
+    const results = [];
+    const requests = [
+      { id: 1, data: { test: "请求1" } },
+      { id: 2, data: { test: "请求2" } },
+      { id: 3, data: { test: "请求3" } }
+    ];
+    
+    try {
+      // 获取公钥
+      const response = await axios.get(
+        `${CryptoTestTools.config.serverUrl}${CryptoTestTools.config.publicKeyEndpoint}`,
+        { timeout: CryptoTestTools.config.timeout }
+      );
+      
+      let publicKey = '';
+      // ...existing public key extraction code...
+      
+      if (!publicKey) {
+        throw new Error('无法获取公钥');
+      }
+      
+      // 为每个请求创建独立的会话密钥
+      const formattedPublicKey = formatRSAPublicKey(publicKey);
+      
+      // 并行处理所有请求
+      await Promise.all(requests.map(async (req) => {
+        // 为每个请求生成唯一密钥
+        const requestKey = CryptoHybrid.keys.generateSymmetricKey(16);
+        console.log(`请求 ${req.id} 使用独立密钥: (${requestKey.length} 字节)`);
+        
+        // 加密会话密钥
+        const encryptedKey = CryptoHybrid.rsa.encrypt(
+          utf8ToBase64(requestKey),
+          formattedPublicKey
+        );
+        
+        // 加密请求数据
+        const encryptedData = CryptoHybrid.aes.encrypt(req.data, requestKey);
+        
+        // 将结果添加到跟踪数组
+        results.push({
+          requestId: req.id,
+          key: requestKey,
+          encryptedKey: encryptedKey,
+          data: req.data,
+          encryptedData: encryptedData
+        });
+      }));
+      
+      console.log('✅ 所有请求处理完成，每个请求使用的是独立密钥:');
+      console.table(results.map(r => ({ 
+        requestId: r.requestId, 
+        keyLength: r.key.length,
+        encryptedDataLength: r.encryptedData.length
+      })));
+      
+      // 验证解密
+      console.log('验证各请求数据能否用对应密钥解密:');
+      for (const result of results) {
+        const decryptResult = CryptoHybrid.aes.decrypt(
+          result.encryptedData, 
+          result.key
+        );
+        
+        console.log(`请求 ${result.requestId} 解密${decryptResult.success ? '成功' : '失败'}`);
+      }
+      
+      // 验证不能用错误密钥解密
+      console.log('验证请求数据不能用其他请求的密钥解密:');
+      const crossDecrypt = CryptoHybrid.aes.decrypt(
+        results[0].encryptedData,
+        results[1].key
+      );
+      
+      console.log(`尝试用请求2的密钥解密请求1的数据: ${crossDecrypt.success ? '成功(不安全!)' : '失败(符合预期)'}`);
+      
+      console.groupEnd();
+      return { success: true, results };
+    } catch (error) {
+      console.error('测试失败:', error);
+      console.groupEnd();
+      return { success: false, error };
+    }
   }
 };
 
@@ -289,9 +379,12 @@ if (typeof window !== 'undefined') {
   // 重新添加原始的函数名称，指向同一个测试函数
   window['comprehensiveEncryptionTest'] = CryptoTestTools.test;
   
+  window['testRequestKeyManagement'] = CryptoTestTools.testRequestKeyManagement;
+  
   console.log('🧪 加密测试工具已加载，请使用以下命令测试:');
   console.log('- cryptoTest() - 简化版测试');
   console.log('- comprehensiveEncryptionTest() - 兼容原测试名称');
+  console.log('- testRequestKeyManagement() - 测试请求级密钥管理'); // 添加到帮助信息
 }
 
 export default CryptoTestTools;

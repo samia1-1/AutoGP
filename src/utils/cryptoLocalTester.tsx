@@ -10,48 +10,61 @@ export const CryptoUtil = {
    * 配置参数
    */
   config: {
-    debug: true,                   // 是否输出调试日志
-    defaultKey: 'ABCDEFGHABCDEFGH' // 修改为16字节
+    debug: true  // 移除defaultKey，使用随机生成的密钥
   },
 
   /**
-   * AES加密工具集 - 确保使用PKCS5Padding
+   * AES加密工具集
    */
   aes: {
     /**
      * AES加密 - 使用ECB模式和PKCS5Padding (与Java兼容)
      * @param data 要加密的数据(字符串或对象)
-     * @param key 加密密钥
-     * @returns 密文格式的加密字符串
+     * @param key 加密密钥，如不提供则随机生成
+     * @returns 加密结果对象，包含密文和使用的密钥
      */
-    encrypt: (data: any, key: string = CryptoUtil.config.defaultKey): string => {
+    encrypt: (data: any, key?: string): { ciphertext: string; key: string } => {
+      // 如果未提供密钥，则随机生成一个16字节密钥
+      const useKey = key || CryptoJS.lib.WordArray.random(16).toString();
+      
       // 1. 数据预处理
       const dataStr = typeof data === 'string' ? data : JSON.stringify(data);
       
       // 2. 处理密钥
-      const keyData = CryptoJS.enc.Utf8.parse(key);
+      const keyData = CryptoJS.enc.Utf8.parse(useKey);
       
-      // 3. 加密 - 使用ECB模式和PKCS5Padding (在CryptoJS中PKCS5和PKCS7填充实际上是相同的)
+      // 3. 加密
       const encrypted = CryptoJS.AES.encrypt(dataStr, keyData, {
         mode: CryptoJS.mode.ECB,
-        padding: CryptoJS.pad.Pkcs7  // 等同于Java的PKCS5Padding
+        padding: CryptoJS.pad.Pkcs7
       });
       
-      // 4. 返回密文格式
-      return encrypted.toString();
+      // 4. 返回密文和使用的密钥
+      return {
+        ciphertext: encrypted.toString(),
+        key: useKey
+      };
     },
 
     /**
-     * AES解密 - 使用ECB模式和PKCS5Padding (与Java兼容)
+     * AES解密 - 需要提供正确的密钥
      * @param encryptedData 加密的数据(密文格式)
      * @param key 解密密钥
-     * @returns 解密结果对象，包含成功状态和解密数据
+     * @returns 解密结果对象
      */
-    decrypt: (encryptedData: string, key: string = CryptoUtil.config.defaultKey): {
+    decrypt: (encryptedData: string, key: string): {
       success: boolean;
       data?: any;
       error?: string;
     } => {
+      // 必须提供密钥
+      if (!key) {
+        return { 
+          success: false, 
+          error: '解密需要提供密钥'
+        };
+      }
+      
       try {
         // 1. 处理密钥
         const keyData = CryptoJS.enc.Utf8.parse(key);
@@ -201,7 +214,7 @@ export const CryptoUtil = {
       // 准备表单数据
       const formData = new URLSearchParams();
       formData.append('encryptedAESKey', sessionKey.encryptedAesKey);
-      formData.append('encryptedData', encryptedData);
+      formData.append('encryptedData', encryptedData.ciphertext);
       
       // 发送请求
       return axios.post(url, formData, {
@@ -306,20 +319,23 @@ export const CryptoUtil = {
    */
   test: {
     /**
-     * 简单的加解密循环测试
+     * 加解密循环测试，使用随机密钥
      */
     encryptionLoop: (data: any = { test: "测试数据", time: Date.now() }): {
       success: boolean;
       original: any;
       encrypted: string;
       decrypted?: any;
+      key: string; // 添加返回使用的密钥
     } => {
       try {
-        // 加密
-        const encrypted = CryptoUtil.aes.encrypt(data);
+        // 生成随机密钥并加密
+        const encryptResult = CryptoUtil.aes.encrypt(data);
+        const key = encryptResult.key;
+        const encrypted = encryptResult.ciphertext;
         
-        // 解密
-        const decrypted = CryptoUtil.aes.decrypt(encrypted);
+        // 使用同一密钥解密
+        const decrypted = CryptoUtil.aes.decrypt(encrypted, key);
         
         // 验证
         const success = decrypted.success && 
@@ -329,14 +345,19 @@ export const CryptoUtil = {
           success,
           original: data,
           encrypted,
-          decrypted: decrypted.data
+          decrypted: decrypted.data,
+          key // 返回使用的密钥
         };
       } catch (error) {
+        // 生成随机密钥用于返回
+        const randomKey = CryptoJS.lib.WordArray.random(16).toString();
+        
         return {
           success: false,
           original: data,
           encrypted: '',
-          error
+          error,
+          key: randomKey // 测试失败也返回一个随机密钥
         };
       }
     },
@@ -357,7 +378,7 @@ export const CryptoUtil = {
       for (const text of testStrings) {
         try {
           const encrypted = CryptoUtil.aes.encrypt(text);
-          const decrypted = CryptoUtil.aes.decrypt(encrypted);
+          const decrypted = CryptoUtil.aes.decrypt(encrypted.ciphertext, encrypted.key);
           
           if (!decrypted.success || decrypted.data !== text) {
             console.error(`UTF-8测试失败: ${text}`);

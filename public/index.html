@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <!-- 修复: 将viewport标签与CSP标签分开 -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    
+    <!-- 如果需要CSP，请使用单独的meta标签 -->
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline';" />
+    
+    <link rel="icon" href="%PUBLIC_URL%/favicon.ico" />
+    <!-- ...其他现有标签... -->
+    <title>玉米连作监测系统</title>
+  </head>
+  <body>
+    <noscript>You need to enable JavaScript to run this app.</noscript>
+    <div id="root"></div>
+  </body>
+</html>

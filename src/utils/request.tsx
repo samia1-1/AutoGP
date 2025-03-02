@@ -161,6 +161,48 @@ const sendSymmetricKeyToServer = async (symmetricKey: string, publicKey: string)
   }
 };
 
+// 改进加密状态管理 - 实现请求与密钥的绑定
+const encryptionState = {
+  publicKey: '',
+  keyMap: new Map<string, string>(), // 存储请求ID到密钥的映射
+  publicKeyPromise: null as Promise<string> | null,
+  isPublicKeyLoading: false,
+  
+  // 为请求生成并保存密钥
+  generateKeyForRequest(requestId: string): string {
+    const newKey = generateSymmetricKey();
+    this.keyMap.set(requestId, newKey);
+    console.log(`[密钥管理] 为请求 ${requestId} 生成新密钥`);
+    return newKey;
+  },
+  
+  // 获取特定请求的密钥
+  getKeyForRequest(requestId: string): string | undefined {
+    return this.keyMap.get(requestId);
+  },
+  
+  // 清理请求的密钥
+  clearKeyForRequest(requestId: string): void {
+    if (this.keyMap.has(requestId)) {
+      console.log(`[密钥管理] 清理请求 ${requestId} 的密钥`);
+      this.keyMap.delete(requestId);
+    }
+  },
+  
+  // 重置公钥状态
+  resetPublicKey() {
+    this.publicKey = '';
+    this.publicKeyPromise = null;
+    this.isPublicKeyLoading = false;
+    console.log('[密钥管理] 已重置公钥');
+  }
+};
+
+// 生成唯一请求ID的函数
+function generateRequestId(): string {
+  return `req-${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 10)}`;
+}
+
 // 请求拦截器
 request.interceptors.request.use(async (config) => {
   const token = getToken()
@@ -196,46 +238,49 @@ request.interceptors.request.use(async (config) => {
     config.headers.token = `${token}`
   }
   
-  // 为所有有请求体的接口使用混合加密
-  if (config.data) {
+  // 为加密请求处理
+  if (config.data && !config.url.includes('/getPublicKey') && !config.url.includes('/decryptKey')) {
     try {
-      // 跳过公钥和密钥相关接口的加密
-      if (config.url.includes('/getPublicKey') || config.url.includes('/decryptKey')) {
-        return config;
-      }
-
-      // 确保获取公钥
-      if (!publicKey) {
+      // 为当前请求生成唯一ID
+      const requestId = generateRequestId();
+      config.headers['x-request-id'] = requestId;
+      
+      // 确保获取到最新的公钥
+      if (!encryptionState.publicKey) {
+        console.log('获取最新公钥...');
         try {
           await fetchPublicKey();
         } catch (error) {
-          console.error("获取公钥失败:", error);
-          throw new Error('获取公钥失败，请刷新页面重试');
+          console.error('[密钥错误] 获取公钥失败:', error);
+          throw new Error('加密初始化失败，请刷新页面');
         }
       }
-
-      // 生成新的对称密钥
-      if (!currentSymmetricKey) {
-        currentSymmetricKey = generateSymmetricKey();
-        console.log('已生成新的对称密钥');
-        
-        const keySent = await sendSymmetricKeyToServer(currentSymmetricKey, publicKey);
-        if (!keySent) {
-          console.error('密钥发送失败，将重试');
-          currentSymmetricKey = ''; // 重置密钥以便下次重试
-          throw new Error('无法安全传输加密密钥，请稍后重试');
-        }
+      
+      // 为当前请求生成唯一密钥
+      const sessionKey = encryptionState.generateKeyForRequest(requestId);
+      console.log(`[请求拦截] 请求${requestId}使用新生成的密钥加密数据`);
+      
+      // 发送密钥到服务器
+      const keySent = await sendSymmetricKeyToServer(
+        sessionKey, 
+        encryptionState.publicKey
+      );
+      
+      if (!keySent) {
+        // 密钥发送失败，清理并报错
+        encryptionState.clearKeyForRequest(requestId);
+        throw new Error('密钥协商失败，请稍后重试');
       }
-
-      // 加密请求数据
+      
+      // 使用请求专用密钥加密数据
       const dataString = typeof config.data === 'string' ? config.data : JSON.stringify(config.data);
-      config.data = aesEncrypt(dataString, currentSymmetricKey);
+      config.data = aesEncrypt(dataString, sessionKey);
       config.headers['x-encrypted-request'] = 'true';
-      console.log('请求数据已加密');
+      console.log(`[请求拦截] 请求${requestId}的数据已加密`);
       
     } catch (error) {
-      console.error("加密过程出错:", error);
-      throw error; // 让错误继续向上传播
+      console.error("[加密错误]", error);
+      throw error;
     }
   }
   return config
@@ -247,42 +292,53 @@ request.interceptors.request.use(async (config) => {
 // 响应拦截器
 request.interceptors.response.use((response) => {
   try {
-    // 检查是否是加密响应
+    const requestId = response.config.headers['x-request-id'];
     const isEncryptedResponse = response.headers['x-encrypted-response'] === 'true';
     
-    // 如果是加密响应且有可用的对称密钥
-    if (isEncryptedResponse && currentSymmetricKey && response.data) {
-      // 解密响应数据
-      const decryptedData = aesDecrypt(response.data, currentSymmetricKey);
+    // 如果是加密响应且有对应的密钥，进行解密
+    if (requestId && isEncryptedResponse && encryptionState.keyMap.has(requestId)) {
+      const sessionKey = encryptionState.getKeyForRequest(requestId);
       
-      // 尝试解析为JSON
-      try {
+      if (!sessionKey) {
+        console.error(`[密钥错误] 找不到请求${requestId}的解密密钥`);
+      } else {
+        console.log(`[响应拦截] 使用请求${requestId}的密钥解密响应数据`);
+        
+        // 解密响应数据
+        const decryptedData = aesDecrypt(response.data, sessionKey);
         response.data = JSON.parse(decryptedData);
-      } catch (e) {
-        // 如果不是JSON，直接使用解密后的字符串
-        response.data = decryptedData;
-        console.error("响应解密错误：", e);
       }
+    }
+    
+    // 请求完成，清理对应的密钥
+    if (requestId) {
+      encryptionState.clearKeyForRequest(requestId);
     }
     
     return response;
   } catch (error) {
-    console.error("响应解密错误：", error);
-    return response; // 即使解密失败也返回原始响应
+    console.error("[响应处理错误]", error);
+    
+    // 即使出错也要尝试清理密钥
+    const requestId = response.config?.headers?.['x-request-id'];
+    if (requestId) {
+      encryptionState.clearKeyForRequest(requestId);
+    }
+    
+    return response;
   }
 }, (error) => {
+  // 请求失败时也要清理密钥
+  if (error.config?.headers?.['x-request-id']) {
+    encryptionState.clearKeyForRequest(error.config.headers['x-request-id']);
+  }
+  
   console.log("响应错误", error);
   
-  if (error.response && error.response.status === 404) return;
+  if (error.response?.status === 404) return;
   message.error("网络连接错误，请检查网络后重试！");
   return Promise.reject(error);
-})
-
-// 定期刷新对称密钥
-setInterval(() => {
-  // 每隔一段时间重置对称密钥，强制下次请求时生成新密钥
-  currentSymmetricKey = '';
-}, 30 * 60 * 1000); // 每30分钟刷新一次
+});
 
 // 尝试在应用启动时预先获取公钥，但不阻塞应用启动
 setTimeout(() => {
