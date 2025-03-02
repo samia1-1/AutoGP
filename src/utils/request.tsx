@@ -4,10 +4,11 @@ import { getToken } from "./token";
 import { message } from "antd";
 import { generateSymmetricKey, encryptSymmetricKeyWithRSA, aesEncrypt, aesDecrypt } from "./cryptoHybrid";
 
-// 替换为状态变量，从服务器获取公钥
-let publicKey = '';
+// 使用硬编码的公钥，不从接口获取
+let publicKey = 'MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAnqd7JccaNO0Bty7HtPzTD4+qiWbsna3m8bWTC+t/VJJkGNq2kNG04rCqEtv55vjTarBJVS3vwDGB+v2fJx0CBubsSAyfWS42U69KZmtrBkohtRwhM6tARnsGNuGyg65tFU4xIY7lEHwTAZvn0UNdyFqPxTzoPCDTD9I9XcQoIyAkeIVJHyF+hEji1VjK3hdaZ+poCTBIjxk4XEqTMXgPYmFU+H8ytJUNrQr5Ra784ezKpOmlCDuk3BYeOG59jcuKoXRaEbIRIOY+AshqzewOIjFpBAwMrM77lUHSjyRkq+2KmHHloWl6cQYuVoiuNt6H/hwt3UPvB0vhd3MOCrUdwwIDAQAB';
+// 不再需要加载状态，因为公钥已经硬编码
 let isPublicKeyLoading = false;
-let publicKeyPromise: Promise<string> | null = null;
+let publicKeyPromise = Promise.resolve(publicKey);
 
 // 存储当前使用的AES密钥
 let currentSymmetricKey = '';
@@ -19,94 +20,9 @@ const request = axios.create({
   timeout: 0
 })
 
-// 获取公钥的函数
+// 修改后的获取公钥函数 - 直接返回硬编码的公钥
 const fetchPublicKey = async (): Promise<string> => {
-  if (publicKey) return publicKey; // 如果已经有公钥，直接返回
-  
-  if (isPublicKeyLoading) {
-    // 如果已经在加载中，返回正在进行的Promise
-    return publicKeyPromise!;
-  }
-  
-  isPublicKeyLoading = true;
-  publicKeyPromise = request.get('/getPublicKey')
-    .then(response => {
-      console.log('获取公钥响应:', response.data);
-      
-      let extractedPublicKey = null;
-      
-      // 增强提取公钥的逻辑，处理更多嵌套情况
-      if (typeof response.data === 'string') {
-        // 直接是字符串公钥
-        extractedPublicKey = response.data;
-        console.log('直接从 response.data 提取公钥字符串');
-      } 
-      else if (response.data?.data) {
-        // 处理嵌套的 data 字段
-        if (typeof response.data.data === 'string') {
-          extractedPublicKey = response.data.data;
-          console.log('从 response.data.data 提取公钥字符串');
-        } 
-        else if (typeof response.data.data === 'object') {
-          // 处理 data 是对象的情况
-          if (response.data.data.publicKey) {
-            extractedPublicKey = response.data.data.publicKey;
-            console.log('从 response.data.data.publicKey 提取公钥');
-          } 
-          // 尝试在 data 对象中寻找含有 "KEY" 的字段
-          else {
-            for (const key in response.data.data) {
-              if (typeof response.data.data[key] === 'string' && 
-                  (key.includes('key') || key.includes('Key') || 
-                   response.data.data[key].includes('KEY'))) {
-                extractedPublicKey = response.data.data[key];
-                console.log(`从 response.data.data.${key} 提取疑似公钥字符串`);
-                break;
-              }
-            }
-          }
-        }
-      }
-      else if (response.data?.publicKey) {
-        extractedPublicKey = response.data.publicKey;
-        console.log('从 response.data.publicKey 提取公钥');
-      }
-      
-      // 尝试遍历顶层对象寻找公钥字段
-      if (!extractedPublicKey && typeof response.data === 'object') {
-        for (const key in response.data) {
-          if (typeof response.data[key] === 'string' && 
-              (key.includes('key') || key.includes('Key') ||
-              (response.data[key].length > 100 && response.data[key].includes('KEY')))) {
-            extractedPublicKey = response.data[key];
-            console.log(`从 response.data.${key} 提取疑似公钥字符串`);
-            break;
-          }
-        }
-      }
-      
-      if (!extractedPublicKey) {
-        console.error('无法从响应中提取公钥:', response.data);
-        throw new Error('服务器未返回有效的公钥格式');
-      }
-      
-      // 保存提取的公钥
-      publicKey = extractedPublicKey;
-      
-      console.log('成功获取公钥:', publicKey.substring(0, 20) + '...');
-      return publicKey;
-    })
-    .catch(error => {
-      console.error('获取公钥出错:', error);
-      // 重置状态，允许下次重试
-      publicKey = '';
-      throw error;
-    })
-    .finally(() => {
-      isPublicKeyLoading = false;
-    });
-  
-  return publicKeyPromise;
+  return publicKey; // 直接返回硬编码的公钥
 };
 
 /**
@@ -163,9 +79,9 @@ const sendSymmetricKeyToServer = async (symmetricKey: string, publicKey: string)
 
 // 改进加密状态管理 - 实现请求与密钥的绑定
 const encryptionState = {
-  publicKey: '',
+  publicKey: publicKey, // 使用硬编码的公钥
   keyMap: new Map<string, string>(), // 存储请求ID到密钥的映射
-  publicKeyPromise: null as Promise<string> | null,
+  publicKeyPromise: Promise.resolve(publicKey),
   isPublicKeyLoading: false,
   
   // 为请求生成并保存密钥
@@ -189,12 +105,10 @@ const encryptionState = {
     }
   },
   
-  // 重置公钥状态
+  // 重置公钥状态 - 由于使用硬编码公钥，此方法实际上不再重置公钥
   resetPublicKey() {
-    this.publicKey = '';
-    this.publicKeyPromise = null;
-    this.isPublicKeyLoading = false;
-    console.log('[密钥管理] 已重置公钥');
+    console.log('[密钥管理] 尝试重置公钥，但使用的是硬编码公钥');
+    // 不再重置公钥，因为使用的是硬编码值
   }
 };
 
@@ -245,16 +159,7 @@ request.interceptors.request.use(async (config) => {
       const requestId = generateRequestId();
       config.headers['x-request-id'] = requestId;
       
-      // 确保获取到最新的公钥
-      if (!encryptionState.publicKey) {
-        console.log('获取最新公钥...');
-        try {
-          await fetchPublicKey();
-        } catch (error) {
-          console.error('[密钥错误] 获取公钥失败:', error);
-          throw new Error('加密初始化失败，请刷新页面');
-        }
-      }
+      // 不再需要获取公钥，直接使用硬编码的公钥
       
       // 为当前请求生成唯一密钥
       const sessionKey = encryptionState.generateKeyForRequest(requestId);
@@ -263,7 +168,7 @@ request.interceptors.request.use(async (config) => {
       // 发送密钥到服务器
       const keySent = await sendSymmetricKeyToServer(
         sessionKey, 
-        encryptionState.publicKey
+        publicKey // 使用硬编码公钥
       );
       
       if (!keySent) {
@@ -340,14 +245,8 @@ request.interceptors.response.use((response) => {
   return Promise.reject(error);
 });
 
-// 尝试在应用启动时预先获取公钥，但不阻塞应用启动
-setTimeout(() => {
-  fetchPublicKey()
-    .then(() => console.log('预加载公钥成功'))
-    .catch(error => {
-      console.warn("预加载公钥失败，将在需要时重试:", error.message);
-    });
-}, 2000); // 延迟2秒再尝试，避免和其他初始化过程冲突
+// 移除预加载公钥的代码，因为我们现在使用硬编码公钥
+console.log('使用硬编码公钥:', publicKey.substring(0, 20) + '...');
 
 export { request, fetchPublicKey };
 
