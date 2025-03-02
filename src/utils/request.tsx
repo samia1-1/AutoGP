@@ -35,19 +35,54 @@ const fetchPublicKey = async (): Promise<string> => {
       
       let extractedPublicKey = null;
       
-      // 根据服务器实际返回的格式提取公钥
-      if (response.data && response.data.data && typeof response.data.data === 'string') {
-        // 处理 {msg: '获取公钥成功', code: 200, data: 'MIIBIjANBgkqhkiG9w0BAQEF...'} 格式
-        extractedPublicKey = response.data.data;
-        console.log('从 response.data.data 提取公钥');
-      } else if (response.data && response.data.publicKey) {
-        // 处理 {publicKey: 'MIIBIjANBgkqhkiG9w0BAQEF...'} 格式
-        extractedPublicKey = response.data.publicKey;
-        console.log('从 response.data.publicKey 提取公钥');
-      } else if (response.data && typeof response.data === 'string') {
-        // 处理直接返回字符串的情况
+      // 增强提取公钥的逻辑，处理更多嵌套情况
+      if (typeof response.data === 'string') {
+        // 直接是字符串公钥
         extractedPublicKey = response.data;
         console.log('直接从 response.data 提取公钥字符串');
+      } 
+      else if (response.data?.data) {
+        // 处理嵌套的 data 字段
+        if (typeof response.data.data === 'string') {
+          extractedPublicKey = response.data.data;
+          console.log('从 response.data.data 提取公钥字符串');
+        } 
+        else if (typeof response.data.data === 'object') {
+          // 处理 data 是对象的情况
+          if (response.data.data.publicKey) {
+            extractedPublicKey = response.data.data.publicKey;
+            console.log('从 response.data.data.publicKey 提取公钥');
+          } 
+          // 尝试在 data 对象中寻找含有 "KEY" 的字段
+          else {
+            for (const key in response.data.data) {
+              if (typeof response.data.data[key] === 'string' && 
+                  (key.includes('key') || key.includes('Key') || 
+                   response.data.data[key].includes('KEY'))) {
+                extractedPublicKey = response.data.data[key];
+                console.log(`从 response.data.data.${key} 提取疑似公钥字符串`);
+                break;
+              }
+            }
+          }
+        }
+      }
+      else if (response.data?.publicKey) {
+        extractedPublicKey = response.data.publicKey;
+        console.log('从 response.data.publicKey 提取公钥');
+      }
+      
+      // 尝试遍历顶层对象寻找公钥字段
+      if (!extractedPublicKey && typeof response.data === 'object') {
+        for (const key in response.data) {
+          if (typeof response.data[key] === 'string' && 
+              (key.includes('key') || key.includes('Key') ||
+              (response.data[key].length > 100 && response.data[key].includes('KEY')))) {
+            extractedPublicKey = response.data[key];
+            console.log(`从 response.data.${key} 提取疑似公钥字符串`);
+            break;
+          }
+        }
       }
       
       if (!extractedPublicKey) {
