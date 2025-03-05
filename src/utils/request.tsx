@@ -3,8 +3,16 @@ import { getToken } from "./token";
 import { message } from "antd";
 import CryptoHybrid, { generateSymmetricKey, aesEncrypt, aesDecrypt } from "./cryptoHybrid";
 
+<<<<<<< HEAD
 // 服务器公钥 - 直接硬编码在本地
 const SERVER_PUBLIC_KEY = 'MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAgMFliHCiiYlPIZ9Om8X8MnjcK9Lx4ESvRcI7gJDP18yLWEkx2ahzpOyE/gdztTXXzHoJ5dbB3NNw1q+HCyn0NUWloA1GNJJ6wT5WOsIEil8aWKAus+Rk+1jOkhHEVC7e0CTsE07iYkPkYzvS4qdR3BqFdmqg5A2I/UDdiRG8e535tMUkCdNCPffAzuxdT0A68mqc3wappLhVqhwhC2ToQzFAfCq8O+RQmZyvL6Bo4pyXAII1LXPTMUM/0jaXn8+TcjjdcGY9eaCDWuiuRcUuk6vzEvdRKuzKvarLhmpgrZWe4aTb7XCExpv7zDuq68f2X43ppvt94PFmrjt6XKjDTQIDAQAB';
+=======
+// 使用硬编码的公钥，不从接口获取
+let publicKey = 'MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAnqd7JccaNO0Bty7HtPzTD4+qiWbsna3m8bWTC+t/VJJkGNq2kNG04rCqEtv55vjTarBJVS3vwDGB+v2fJx0CBubsSAyfWS42U69KZmtrBkohtRwhM6tARnsGNuGyg65tFU4xIY7lEHwTAZvn0UNdyFqPxTzoPCDTD9I9XcQoIyAkeIVJHyF+hEji1VjK3hdaZ+poCTBIjxk4XEqTMXgPYmFU+H8ytJUNrQr5Ra784ezKpOmlCDuk3BYeOG59jcuKoXRaEbIRIOY+AshqzewOIjFpBAwMrM77lUHSjyRkq+2KmHHloWl6cQYuVoiuNt6H/hwt3UPvB0vhd3MOCrUdwwIDAQAB';
+// 不再需要加载状态，因为公钥已经硬编码
+let isPublicKeyLoading = false;
+let publicKeyPromise = Promise.resolve(publicKey);
+>>>>>>> 63b96c3268639e397275f7e09998c2e28137baa0
 
 // 存储当前使用的AES密钥
 let currentSymmetricKey = '';
@@ -16,6 +24,7 @@ const request = axios.create({
   timeout: 0
 })
 
+<<<<<<< HEAD
 // RSA加密调试开关
 const DEBUG_RSA = true;
 
@@ -26,6 +35,11 @@ let lastEncryptionData = {
   encryptedData: '',
   sessionKey: '',
   publicKey: SERVER_PUBLIC_KEY
+=======
+// 修改后的获取公钥函数 - 直接返回硬编码的公钥
+const fetchPublicKey = async (): Promise<string> => {
+  return publicKey; // 直接返回硬编码的公钥
+>>>>>>> 63b96c3268639e397275f7e09998c2e28137baa0
 };
 
 // 优化自动测试函数 - 移除硬编码私钥依赖
@@ -92,6 +106,49 @@ const testRequestEncryption = (
   }
 };
 
+<<<<<<< HEAD
+=======
+// 改进加密状态管理 - 实现请求与密钥的绑定
+const encryptionState = {
+  publicKey: publicKey, // 使用硬编码的公钥
+  keyMap: new Map<string, string>(), // 存储请求ID到密钥的映射
+  publicKeyPromise: Promise.resolve(publicKey),
+  isPublicKeyLoading: false,
+  
+  // 为请求生成并保存密钥
+  generateKeyForRequest(requestId: string): string {
+    const newKey = generateSymmetricKey();
+    this.keyMap.set(requestId, newKey);
+    console.log(`[密钥管理] 为请求 ${requestId} 生成新密钥`);
+    return newKey;
+  },
+  
+  // 获取特定请求的密钥
+  getKeyForRequest(requestId: string): string | undefined {
+    return this.keyMap.get(requestId);
+  },
+  
+  // 清理请求的密钥
+  clearKeyForRequest(requestId: string): void {
+    if (this.keyMap.has(requestId)) {
+      console.log(`[密钥管理] 清理请求 ${requestId} 的密钥`);
+      this.keyMap.delete(requestId);
+    }
+  },
+  
+  // 重置公钥状态 - 由于使用硬编码公钥，此方法实际上不再重置公钥
+  resetPublicKey() {
+    console.log('[密钥管理] 尝试重置公钥，但使用的是硬编码公钥');
+    // 不再重置公钥，因为使用的是硬编码值
+  }
+};
+
+// 生成唯一请求ID的函数
+function generateRequestId(): string {
+  return `req-${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 10)}`;
+}
+
+>>>>>>> 63b96c3268639e397275f7e09998c2e28137baa0
 // 请求拦截器
 request.interceptors.request.use(async (config) => {
   const token = getToken()
@@ -119,6 +176,7 @@ request.interceptors.request.use(async (config) => {
   // 为所有有请求体的接口使用混合加密
   if (config.data) {
     try {
+<<<<<<< HEAD
       // 跳过公钥接口的加密
       if (config.url.includes('/getPublicKey')) {
         return config;
@@ -128,13 +186,36 @@ request.interceptors.request.use(async (config) => {
       const symmetricKey = generateSymmetricKey();
       console.log('已生成新的对称密钥:', symmetricKey);
       currentSymmetricKey = symmetricKey;
+=======
+      // 为当前请求生成唯一ID
+      const requestId = generateRequestId();
+      config.headers['x-request-id'] = requestId;
+      
+      // 不再需要获取公钥，直接使用硬编码的公钥
+>>>>>>> 63b96c3268639e397275f7e09998c2e28137baa0
       
       // 加密AES密钥
       const base64Key = CryptoHybrid.common.utf8ToBase64(symmetricKey);
       const encryptedAESKey = CryptoHybrid.keys.encryptWithRSA(base64Key, SERVER_PUBLIC_KEY);
       console.log('已加密AES密钥:', encryptedAESKey.substring(0, 20) + '...');
       
+<<<<<<< HEAD
       // 加密请求数据
+=======
+      // 发送密钥到服务器
+      const keySent = await sendSymmetricKeyToServer(
+        sessionKey, 
+        publicKey // 使用硬编码公钥
+      );
+      
+      if (!keySent) {
+        // 密钥发送失败，清理并报错
+        encryptionState.clearKeyForRequest(requestId);
+        throw new Error('密钥协商失败，请稍后重试');
+      }
+      
+      // 使用请求专用密钥加密数据
+>>>>>>> 63b96c3268639e397275f7e09998c2e28137baa0
       const dataString = typeof config.data === 'string' ? config.data : JSON.stringify(config.data);
       const encryptedData = CryptoHybrid.aes.encrypt(dataString, symmetricKey);
       console.log('已加密请求数据');
@@ -247,6 +328,7 @@ request.interceptors.response.use((response) => {
   return Promise.reject(error);
 })
 
+<<<<<<< HEAD
 // 导出调试工具
 if (typeof window !== 'undefined') {
   // 扩展现有的debugRSA对象
@@ -285,6 +367,10 @@ if (typeof window !== 'undefined') {
     
     // 获取本地存储的服务器公钥
     getPublicKey: () => SERVER_PUBLIC_KEY,
+=======
+// 移除预加载公钥的代码，因为我们现在使用硬编码公钥
+console.log('使用硬编码公钥:', publicKey.substring(0, 20) + '...');
+>>>>>>> 63b96c3268639e397275f7e09998c2e28137baa0
 
     // 直接使用内部testRequestEncryption函数
     testFailedRequest: () => {

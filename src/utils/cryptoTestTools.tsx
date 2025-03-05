@@ -6,6 +6,13 @@ import { CryptoHybrid } from './cryptoHybrid';
 const formatRSAPublicKey = CryptoHybrid.common.formatRSAPublicKey;
 const utf8ToBase64 = CryptoHybrid.common.utf8ToBase64;
 
+<<<<<<< HEAD
+=======
+/**
+ * 简化版加密测试工具
+ * 只保留综合测试功能
+ */
+>>>>>>> 63b96c3268639e397275f7e09998c2e28137baa0
 export const CryptoTestTools = {
   /**
    * 配置参数
@@ -13,7 +20,11 @@ export const CryptoTestTools = {
   config: {
     serverUrl: 'http://218.199.69.63:39600',
     // publicKeyEndpoint: '/getPublicKey', // 移除获取公钥端点
+<<<<<<< HEAD
     publicKey: 'MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAlAz0N/LGPJ9EsJ8qVCgDWXbNBeuUPQcil0fIUBvNOYN80mbgeSSlHeYbRc2Z/GfV2zFWlEprTFXyv9h3GyvrRnx4xtLL2HiX2MQcR97h1bM4BgJeexvbjNs0YlZIck8r83Ar88FzY6wKda5NUzNcbRRm7gwgiDirCZnL+Byl7S0WVGuMpsCci5p49qs/L+/+biF5Hs5A+8+7yI+WN7NXAoaaCvufEOJdmUweCMlEqL0EXdQTkLKYB37kaWHbQSdA1r8XMHWBB8yJaj8yXWWAt+rGuKuCa10u3Gr8ckH5tA7UNU8dwVwMw229HcwNCBQzqWZbSoY+X91QGO6yymCkUQIDAQAB',
+=======
+    publicKey: 'MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAyMEClBkki8JslEyx8Hd3CMEQyvWrLSFUCAtwuKVDzDNAMLNPZ7Ov2Wxb0kYco5N9oxGbh67J1sD6UmzKaywhi6Mjn3vHeA4WzIajKBnKYBJV22omzl9aktDZCe2xc6i17GUx4Ar2C8n+5Eb6TfYOJ+eiKFrzZx7UI30n1BJDxUFontCmIK6HhkNVXKvDS/wd2RR/kTY5xMIr/54DyrHG5qTSjJyA94bKfCpvA4zoRtPh5sodsdNLPcG6VhFfvH7yJZQhtrY6RSqD1g4CS1EUdVS7Bc0bfuA/AU4pE267yGTszJA691XIJJk1rnvnBf6tFe/0k/gyUTUyZh7rxvNEGQIDAQAB',
+>>>>>>> 63b96c3268639e397275f7e09998c2e28137baa0
     decryptEndpoint: '/decryptKey1',
     timeout: 15000,
     defaultKey: 'ABCDEFGHABCDEFGH' // 修改为16字节
@@ -27,7 +38,11 @@ export const CryptoTestTools = {
      * 综合加密测试 - 集成验证一致性和本地解密功能
      * 一站式验证加密系统的工作状态并提供详细诊断
      */
+<<<<<<< HEAD
     comprehensiveEncryptionTest: async (testData: any = { message: "Comprehensive", timestamp: Date.now() }): Promise<{
+=======
+    comprehensiveEncryptionTest: async (testData: any = { message: "Comprehensive test", timestamp: Date.now() }): Promise<{
+>>>>>>> 63b96c3268639e397275f7e09998c2e28137baa0
       success: boolean;
       serverCommunication: boolean;
       localEncryption: boolean;
@@ -792,9 +807,17 @@ async function testServerEncryption(testData: any = { message: "Backend test dat
 
 if (typeof window !== 'undefined') {
   window['cryptoTest'] = CryptoTestTools;
+<<<<<<< HEAD
   window['comprehensiveEncryptionTest'] = CryptoTestTools.diagnostics.comprehensiveEncryptionTest;
   
   
+=======
+  
+  // 只保留综合测试函数
+  window['comprehensiveEncryptionTest'] = CryptoTestTools.diagnostics.comprehensiveEncryptionTest;
+  
+  
+>>>>>>> 63b96c3268639e397275f7e09998c2e28137baa0
   console.log('🧪 加密测试工具已加载! 可用命令:');
   console.log('- comprehensiveEncryptionTest() - 执行综合性加密系统测试');
 }
