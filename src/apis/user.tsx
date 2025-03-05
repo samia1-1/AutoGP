@@ -1,71 +1,52 @@
 import { request } from '@/utils';
 
-// 登录
-interface LoginData {
-  username: string;
-  password: string;
-}
-function loginAPI(loginData: LoginData) {
-  return request.post('/user/login', loginData)
-    .then(response => response)
-    .catch(error => {
-      throw error;
-    })
-}
-
-// 邮箱登录
-function emailLoginAPI(data) {
-  return request.post('/user/loginEmail', data)
-    .then(response => response)
-    .catch(error => {
-      throw error;
-    })
-}
-
-// 邮箱注册
-function registerAPI(registerData) {
-  return request.post('/enrollEmail', registerData)
-    .then(response => response)
-    .catch(error => {
-      throw error;
-    })
+// 创建API请求函数的工厂
+const createAPI = (url: string, method: 'get' | 'post' = 'post') => {
+  return (data?: any) => {
+    const config = {
+      url,
+      method,
+      headers: { 
+        'Content-Type': 'application/json',
+        // 添加标志，表示请求已加密
+        'x-encrypted-request': 'true' 
+      }
+    };
+    
+    // GET请求处理参数
+    if (method === 'get' && data) {
+      return request({ ...config, params: data });
+    }
+    
+    // POST请求处理数据
+    // 注意: 数据会自动由request拦截器加密
+    return request({ ...config, data });
+  };
 };
-// 发送验证码
-function getCodeAPI(email) {
-  console.log(email);
+
+// 用户相关API
+const userAPI = {
+  // 登录相关
+  login: createAPI('/user/login'),
+  emailLogin: createAPI('/user/loginEmail'),
+  register: createAPI('/enrollEmail'),
+  getCode: createAPI('/email/code', 'get'),
   
-  return request.get('/email/code',{ params: { email } })
-    .then(response => response)
-    .catch(error => {
-      throw error;
-    })
-}
+  // 用户信息相关
+  getUserInfo: createAPI('/user/get', 'get'),
+  revisePassword: createAPI('/revise/password'),
+  changeUserInfo: createAPI('/revise/user')
+};
 
-// 获取个人信息
-function getUserInfoAPI() {
-  return request.get('/user/get')
-    .then(response => response)
-    .catch(error => {
-      throw error;
-    })
-}
+// 为了保持向后兼容，导出原有函数
+export const loginAPI = userAPI.login;
+export const emailLoginAPI = userAPI.emailLogin;
+export const registerAPI = userAPI.register;
+export const getCodeAPI = userAPI.getCode;
+export const getUserInfoAPI = userAPI.getUserInfo;
+export const revisePasswordAPI = userAPI.revisePassword;
+export const changeUserInfo = userAPI.changeUserInfo;
 
-// 修改密码
-function revisePasswordAPI(newPassword: string) {
-  return request.post('/revise/password', newPassword)
-    .then(response => response)
-    .catch(error => {
-      throw error;
-    })
-}
-
-// 修改个人信息
-function changeUserInfo(UserInfo) {
-  return request.post('/revise/user', UserInfo)
-    .then(response => response)
-    .catch(error => {
-      throw error;
-    })
-}
-export { registerAPI,getCodeAPI, loginAPI,emailLoginAPI, getUserInfoAPI, revisePasswordAPI, changeUserInfo }
+// 导出统一的API对象
+export default userAPI;
 
