@@ -61,7 +61,4 @@ interface Window {
 
   // 便捷测试方法
   testEncryption: () => any;
-
-  // 初始化调试工具的方法
-  initDebugTools: () => boolean;
 }

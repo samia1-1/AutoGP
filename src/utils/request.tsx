@@ -1,96 +1,28 @@
+// 封装axios
 import axios from "axios";
 import { getToken } from "./token";
-import { message } from "antd";
-import CryptoHybrid, { generateSymmetricKey, aesEncrypt, aesDecrypt } from "./cryptoHybrid";
+import CryptoHybrid from "./cryptoHybrid";
 
-// 服务器公钥 - 直接硬编码在本地
+// 获取需要使用的加密函数
+const { keys, aes } = CryptoHybrid;
+const { generateSymmetricKey } = keys;
+const { encrypt: aesEncrypt, decrypt: aesDecrypt } = aes;
+
+// 直接使用本地硬编码的服务器公钥
 const SERVER_PUBLIC_KEY = 'MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAgMFliHCiiYlPIZ9Om8X8MnjcK9Lx4ESvRcI7gJDP18yLWEkx2ahzpOyE/gdztTXXzHoJ5dbB3NNw1q+HCyn0NUWloA1GNJJ6wT5WOsIEil8aWKAus+Rk+1jOkhHEVC7e0CTsE07iYkPkYzvS4qdR3BqFdmqg5A2I/UDdiRG8e535tMUkCdNCPffAzuxdT0A68mqc3wappLhVqhwhC2ToQzFAfCq8O+RQmZyvL6Bo4pyXAII1LXPTMUM/0jaXn8+TcjjdcGY9eaCDWuiuRcUuk6vzEvdRKuzKvarLhmpgrZWe4aTb7XCExpv7zDuq68f2X43ppvt94PFmrjt6XKjDTQIDAQAB';
 
 // 存储当前使用的AES密钥
 let currentSymmetricKey = '';
 
+// 添加请求ID到会话密钥的映射表，确保响应可以正确找到对应的密钥
+const requestKeyMap = new Map();
+
 // 配置根域名、超时时间
 const request = axios.create({
-  baseURL: 'http://218.199.69.63:39600',
-  // baseURL:"/api",
+  // baseURL: 'http://218.199.69.63:39600',
+  baseURL:"/api",
   timeout: 0
-})
-
-// RSA加密调试开关
-const DEBUG_RSA = true;
-
-// 保存最近的加密数据，用于错误时测试
-let lastEncryptionData = {
-  originalData: null,
-  encryptedAESKey: '',
-  encryptedData: '',
-  sessionKey: '',
-  publicKey: SERVER_PUBLIC_KEY
-};
-
-// 优化自动测试函数 - 移除硬编码私钥依赖
-const testRequestEncryption = (
-  originalData: any, 
-  encryptedKey: string, 
-  sessionKey: string
-) => {
-  console.group('🔍 请求失败 - 自动分析加密流程');
-  
-  try {
-    // 1. 储存测试信息
-    console.log('测试数据信息:');
-    console.log('- 原始数据:', originalData);
-    console.log('- 加密的AES密钥:', encryptedKey);
-    console.log('- AES会话密钥:', sessionKey);
-    console.log('- 使用的公钥:', SERVER_PUBLIC_KEY.substring(0, 20) + '...');
-    
-    // 2. 通知用户无法执行私钥解密测试
-    console.log('\n⚠️ 注意：本地测试工具不包含私钥');
-    console.log('RSA私钥仅在服务器端存在，本地解密测试已禁用');
-    
-    // 3. 执行仍然可行的测试
-    import('./cryptoHybrid').then((CryptoModule) => {
-      try {
-        // 验证AES加密是否正常工作
-        if (lastEncryptionData.encryptedData) {
-          console.log('\n1️⃣ 测试AES对称加密/解密功能...');
-          const decryptResult = CryptoModule.default.aes.decrypt(
-            lastEncryptionData.encryptedData, 
-            sessionKey
-          );
-          
-          console.log('AES解密结果:', decryptResult.success ? '✅ 成功' : '❌ 失败');
-          if (decryptResult.success) {
-            console.log('解密数据:', decryptResult.data);
-            
-            // 再次加密，验证加密过程是否确定性
-            const reEncrypted = CryptoModule.default.aes.encrypt(decryptResult.data, sessionKey);
-            const encryptMatch = reEncrypted === lastEncryptionData.encryptedData;
-            console.log('重新加密结果与原密文匹配:', encryptMatch ? '✅ 是' : '❌ 否');
-          } else {
-            console.error('解密错误:', decryptResult.error);
-          }
-        }
-        
-        // 通知用户使用服务端日志检查RSA问题
-        console.log('\n2️⃣ 诊断建议:');
-        console.log('- 检查服务器日志，确认是否成功收到了AES密钥和加密数据');
-        console.log('- 确认服务器端的RSA私钥与本地使用的公钥匹配');
-      } catch (error) {
-        console.error('测试过程出错:', error);
-      }
-    });
-    
-    // 4. 提示使用控制台调试
-    console.log('\n💡 提示: 可以使用以下命令进行进一步加密流程测试:');
-    console.log("window.debugRSA.validateEncryption(data, null, encryptedData, sessionKey)");
-    
-  } catch (error) {
-    console.error('测试过程出错:', error);
-  } finally {
-    console.groupEnd();
-  }
-};
+});
 
 // 请求拦截器
 request.interceptors.request.use(async (config) => {
@@ -116,108 +48,115 @@ request.interceptors.request.use(async (config) => {
     config.headers.token = `${token}`
   }
   
-  // 为所有有请求体的接口使用混合加密
+  // 为所有有请求体的接口使用加密
   if (config.data) {
     try {
-      // 跳过公钥接口的加密
-      if (config.url.includes('/getPublicKey')) {
-        return config;
+      // 如果没有会话密钥，生成一个新的
+      if (!currentSymmetricKey) {
+        currentSymmetricKey = generateSymmetricKey();
+        console.log('已生成新的会话密钥:', currentSymmetricKey);
       }
 
-      // 每次请求都使用新的对称密钥
-      const symmetricKey = generateSymmetricKey();
-      console.log('已生成新的对称密钥:', symmetricKey);
-      currentSymmetricKey = symmetricKey;
-      
-      // 加密AES密钥
-      const base64Key = CryptoHybrid.common.utf8ToBase64(symmetricKey);
-      const encryptedAESKey = CryptoHybrid.keys.encryptWithRSA(base64Key, SERVER_PUBLIC_KEY);
-      console.log('已加密AES密钥:', encryptedAESKey.substring(0, 20) + '...');
-      
       // 加密请求数据
       const dataString = typeof config.data === 'string' ? config.data : JSON.stringify(config.data);
-      const encryptedData = CryptoHybrid.aes.encrypt(dataString, symmetricKey);
-      console.log('已加密请求数据');
+      const encryptedData = aesEncrypt(dataString, currentSymmetricKey);
       
-      // 将原始请求数据替换为混合加密结构
-      config.data = {
-        encryptedAESKey, // RSA加密后的AES密钥
-        encryptedData    // AES加密后的数据
+      // 修改：直接对AES密钥进行RSA加密，不再进行Base64编码
+      // const base64SessionKey = CryptoHybrid.common.utf8ToBase64(currentSymmetricKey);
+      // const rsaEncryptedKey = CryptoHybrid.keys.encryptWithRSA(base64SessionKey, SERVER_PUBLIC_KEY);
+      
+      // 直接使用RSA加密AES密钥 (UTF-8格式)
+      const rsaEncryptedKey = CryptoHybrid.keys.encryptWithRSA(currentSymmetricKey, SERVER_PUBLIC_KEY);
+      
+      // 构建加密请求体 - 只包含加密数据，不包含任何原始密钥信息
+      const encryptedPayload = {
+        encryptedAESKey: rsaEncryptedKey, // 只发送RSA加密后的密钥
+        encryptedData: encryptedData      // 只发送AES加密后的数据
       };
       
-      // 添加标记头，表示此请求已加密
+      // 生成请求ID并将密钥与请求ID关联
+      const requestId = Date.now().toString() + Math.random().toString(36).substr(2, 5);
+      config.headers['x-request-id'] = requestId;
+      requestKeyMap.set(requestId, currentSymmetricKey);
+      
+      console.log(`请求ID ${requestId} 关联到密钥 ${currentSymmetricKey}`);
+      
+      // 设置超时清理，避免内存泄漏
+      setTimeout(() => {
+        if (requestKeyMap.has(requestId)) {
+          console.log(`清理未使用的请求密钥映射: ${requestId}`);
+          requestKeyMap.delete(requestId);
+        }
+      }, 60000); // 60秒后清理
+
+      // 替换原始请求数据
+      config.data = encryptedPayload;
       config.headers['x-encrypted-request'] = 'true';
-      console.log('请求数据已加密并重构');
+      console.log('请求数据已加密');
       
-      // === 新增：打印完整的加密后请求，便于调试 ===
-      console.group('📦 加密后的完整请求数据');
-      console.log('请求URL:', config.url);
-      console.log('原始数据:', dataString);
-      console.log('会话密钥:', symmetricKey);
-      console.log('完整请求体:');
-      console.log(JSON.stringify(config.data, null, 2));
-      console.log('加密AES密钥长度:', encryptedAESKey.length);
+      // 在日志中明确标识发送的是加密后的密钥
+      console.log('🔒 加密请求');
+      console.log('URL:', `${request.defaults.baseURL}${config.url}`); // 使用完整URL便于调试
+      console.log('请求ID:', requestId);
+      console.log('加密状态: ✓ 已加密');
+      console.log('原始会话密钥(仅在客户端使用):', currentSymmetricKey);
+      console.log('RSA直接加密密钥(无Base64)长度:', rsaEncryptedKey.length);
       console.log('加密数据长度:', encryptedData.length);
-      console.log('请求头:', config.headers);
-      console.groupEnd();
-      // === 打印结束 ===
-      
-      // 保存当前加密的数据，以备测试
-      lastEncryptionData = {
-        originalData: dataString,
-        encryptedAESKey,
-        encryptedData,
-        sessionKey: symmetricKey,
-        publicKey: SERVER_PUBLIC_KEY
-      };
+      console.log('请求体:', config.data);
       
     } catch (error) {
       console.error("加密过程出错:", error);
-      
-      // 确保在错误情况下执行测试
-      if (lastEncryptionData.encryptedAESKey) {
-        testRequestEncryption(
-          lastEncryptionData.originalData,
-          lastEncryptionData.encryptedAESKey,
-          lastEncryptionData.sessionKey
-        );
-      }
-      
-      throw error; // 让错误继续向上传播
+      throw error;
     }
   }
-  return config
+
+  return config;
 }, (error) => {
-  console.log("请求拦截器错误:", error);
-  
-  // 尝试在请求拦截器错误时进行测试
-  if (lastEncryptionData.encryptedAESKey) {
-    testRequestEncryption(
-      lastEncryptionData.originalData,
-      lastEncryptionData.encryptedAESKey,
-      lastEncryptionData.sessionKey
-    );
-  }
-  
-  return Promise.reject(error);
-})
+  console.log(error);
+  return Promise.reject(error)
+});
 
 // 响应拦截器
 request.interceptors.response.use((response) => {
+  console.log('拦截器收到响应:', response.config);
   try {
-    // 检查是否是加密响应
-    const isEncryptedResponse = response.headers['x-encrypted-response'] === 'true';
+    // 获取关联的会话密钥（所有响应均为加密数据）
+    let sessionKey = currentSymmetricKey;
+    const requestId = response.config?.headers?.['x-request-id'];
     
-    // 如果是加密响应且有可用的对称密钥
-    if (isEncryptedResponse && currentSymmetricKey && response.data) {
-      // 解密响应数据
-      const decryptResult = CryptoHybrid.aes.decrypt(response.data, currentSymmetricKey);
+    // 从映射表中查找当前请求对应的密钥
+    if (requestId && requestKeyMap.has(requestId)) {
+      sessionKey = requestKeyMap.get(requestId);
+      console.log(`使用请求ID ${requestId} 对应的密钥解密响应`);
+      
+      // 密钥使用后从映射表中删除
+      requestKeyMap.delete(requestId);
+    } else {
+      console.log('未找到请求匹配密钥，使用当前全局密钥解密');
+    }
+    
+    // 检查响应数据是否存在且会话密钥可用
+    if (response.data && sessionKey) {
+      // 直接对响应体进行解密（响应体即为加密数据）
+      const decryptResult = aesDecrypt(response.data, sessionKey);
       
       if (decryptResult.success) {
         response.data = decryptResult.data;
         console.log('响应数据解密成功');
       } else {
-        console.error("响应解密错误：", decryptResult.error);
+        console.log("首次解密失败:", decryptResult.error);
+        
+        // 尝试使用全局密钥作为备用（如果使用的不是全局密钥）
+        if (sessionKey !== currentSymmetricKey) {
+          console.log('尝试使用全局会话密钥进行备用解密');
+          const retryResult = aesDecrypt(response.data, currentSymmetricKey);
+          if (retryResult.success) {
+            response.data = retryResult.data;
+            console.log('使用全局密钥解密成功');
+          } else {
+            console.error("备用解密也失败，返回原始加密数据");
+          }
+        }
       }
     }
     
@@ -229,148 +168,80 @@ request.interceptors.response.use((response) => {
 }, (error) => {
   console.log("响应错误", error);
   
-  // 确保在响应错误时执行测试
-  if (error.config && error.config.data && lastEncryptionData.encryptedAESKey) {
-    console.warn('请求失败，自动检查加密流程...');
-    setTimeout(() => {
-      // 延迟执行，确保不会被其他错误处理打断
-      testRequestEncryption(
-        lastEncryptionData.originalData,
-        lastEncryptionData.encryptedAESKey,
-        lastEncryptionData.sessionKey
-      );
-    }, 10);
-  }
-  
   if (error.response && error.response.status === 404) return;
-  message.error("网络连接错误，请检查网络后重试！");
   return Promise.reject(error);
-})
+});
 
-// 导出调试工具
-if (typeof window !== 'undefined') {
-  // 扩展现有的debugRSA对象
-  const existingDebugRSA = window.debugRSA || {};
-  
-  window['debugRSA'] = {
-    ...existingDebugRSA,
-    
-    // 手动执行当前加密数据的测试
-    testCurrentEncryption: () => {
-      if (!lastEncryptionData.encryptedAESKey) {
-        console.error('没有可用的加密数据进行测试');
-        return { success: false, error: '没有可用的加密数据' };
-      }
-      
-      // 执行测试，但不依赖本地私钥
-      testRequestEncryption(
-        lastEncryptionData.originalData,
-        lastEncryptionData.encryptedAESKey,
-        lastEncryptionData.sessionKey
-      );
-      
-      return lastEncryptionData;
+// 修改定期刷新对称密钥的逻辑，确保正在进行的请求不受影响
+setInterval(() => {
+  // 如果映射表为空（没有进行中的请求），才刷新会话密钥
+  if (requestKeyMap.size === 0) {
+    console.log('刷新会话密钥');
+    currentSymmetricKey = '';
+  } else {
+    console.log(`跳过密钥刷新，有${requestKeyMap.size}个请求进行中`);
+  }
+}, 30 * 60 * 1000); // 每30分钟尝试刷新一次
+
+/**
+ * 获取加密状态信息
+ * 用于监控和调试加密系统
+ */
+const getEncryptionStatus = () => {
+  return {
+    // 会话密钥状态
+    sessionKey: {
+      exists: !!currentSymmetricKey,
+      length: currentSymmetricKey?.length || 0
     },
     
-    // 获取最近的加密数据
-    getLastEncryptionData: () => lastEncryptionData,
+    // 公钥状态
+    publicKey: {
+      exists: true,
+      loading: false,
+      length: SERVER_PUBLIC_KEY?.length || 0
+    },
     
-    // 获取当前加密状态
-    getState: () => ({
-      publicKey: SERVER_PUBLIC_KEY ? (SERVER_PUBLIC_KEY.substring(0, 20) + '...') : null,
-      hasSymmetricKey: !!currentSymmetricKey, 
-      symmetricKey: currentSymmetricKey || null,
-      encryptionMode: 'hybrid-per-request'
-    }),
+    // 最近事件
+    lastEvent: new Date().toISOString(),
     
-    // 获取本地存储的服务器公钥
-    getPublicKey: () => SERVER_PUBLIC_KEY,
-
-    // 直接使用内部testRequestEncryption函数
-    testFailedRequest: () => {
-      if (!lastEncryptionData.encryptedAESKey) {
-        console.error('没有可用的加密数据进行测试');
-        return { success: false, error: '没有加密记录' };
-      }
-      
-      testRequestEncryption(
-        lastEncryptionData.originalData,
-        lastEncryptionData.encryptedAESKey,
-        lastEncryptionData.sessionKey
-      );
-      
-      return lastEncryptionData;
-    }
+    // 加密模式
+    mode: 'aes-with-rsa'
   };
-  
-  // 添加测试方法
-  window['testHybridEncryption'] = async (data = { test: "data" }) => {
-    try {
-      // 生成新密钥
-      const symmetricKey = generateSymmetricKey();
-      
-      // 加密AES密钥
-      const base64Key = CryptoHybrid.common.utf8ToBase64(symmetricKey);
-      const encryptedAESKey = CryptoHybrid.keys.encryptWithRSA(base64Key, SERVER_PUBLIC_KEY);
-      
-      // 加密数据
-      const dataString = typeof data === 'string' ? data : JSON.stringify(data);
-      const encryptedData = CryptoHybrid.aes.encrypt(dataString, symmetricKey);
-      
-      // 构建请求结构
-      const requestBody = {
-        encryptedAESKey,
-        encryptedData
-      };
-      
-      console.log('测试加密结果:', {
-        originalData: data,
-        encryptedRequest: requestBody,
-        sessionKey: symmetricKey
-      });
-      
-      return {
-        success: true,
-        data: requestBody,
-        sessionKey: symmetricKey
-      };
-    } catch (error) {
-      console.error('混合加密测试失败:', error);
-      return { success: false, error };
-    }
-  };
-  
-  // 导出服务器公钥
-  window['getServerPublicKey'] = () => SERVER_PUBLIC_KEY;
+};
 
-  // 添加一个复制加密后请求体的方法，方便调试
-  window['copyLastRequest'] = () => {
-    if (!lastEncryptionData.encryptedAESKey) {
-      console.error('没有可用的加密数据');
-      return false;
+// 添加testEncryption函数，为了保持兼容性
+const testEncryption = (data = { test: "测试数据" }) => {
+  try {
+    // 简单的测试加密流程
+    if (!currentSymmetricKey) {
+      currentSymmetricKey = generateSymmetricKey();
     }
     
-    const requestBody = {
-      encryptedAESKey: lastEncryptionData.encryptedAESKey,
-      encryptedData: lastEncryptionData.encryptedData
+    // 加密测试数据
+    const dataString = JSON.stringify(data);
+    const encryptedData = aesEncrypt(dataString, currentSymmetricKey);
+    
+    // 解密测试
+    const decryptResult = aesDecrypt(encryptedData, currentSymmetricKey);
+    
+    // 检验是否匹配
+    const decryptedStr = typeof decryptResult.data === 'string' ? 
+      decryptResult.data : JSON.stringify(decryptResult.data);
+    
+    const dataMatch = decryptedStr === dataString;
+    
+    return {
+      success: dataMatch,
+      sessionKey: currentSymmetricKey,
+      encryptedData,
+      decryptedData: decryptResult.data
     };
-    
-    // 将加密后的请求体复制到剪贴板
-    try {
-      const requestJson = JSON.stringify(requestBody, null, 2);
-      navigator.clipboard.writeText(requestJson)
-        .then(() => console.log('✅ 加密后的请求已复制到剪贴板'))
-        .catch(err => console.error('❌ 复制失败:', err));
-      
-      console.log('最近的加密请求体:', requestJson);
-      return true;
-    } catch (e) {
-      console.error('复制失败:', e);
-      return false;
-    }
-  };
-}
+  } catch (error: any) { // 添加类型断言
+    console.error('加密测试失败:', error);
+    return { success: false, error: error.message || '未知错误' };
+  }
+};
 
-// 导出请求实例和服务器公钥
-export { request, SERVER_PUBLIC_KEY };
+export { request, getEncryptionStatus, testEncryption, SERVER_PUBLIC_KEY };
 

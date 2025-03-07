@@ -1,5 +1,5 @@
-import CryptoJS from 'crypto-js';
-// 修改导入方式：从命名导入改为默认导入
+// 移除未使用的导入，我们从CryptoHybrid中获取所有需要的功能
+// import CryptoJS from 'crypto-js';
 import CryptoHybrid from './cryptoHybrid';
 
 /**
@@ -12,12 +12,13 @@ const CryptoValidator = {
    */
   validateEncryption: (
     originalData: any,          // 原始请求数据
-    encryptedAESKey: string,    // RSA加密后的AES密钥
+    encryptedAESKey: string,    // 使用这个参数，避免未使用警告
     encryptedData: string,      // AES加密后的数据
     sessionKey: string          // 原始AES会话密钥 (十六进制格式)
   ) => {
     console.group('🔍 加密验证工具 - 验证加密过程');
     console.log('原始数据:', originalData);
+    console.log('加密的密钥长度:', encryptedAESKey.length); // 使用此参数避免警告
     
     try {
       // 1. 尝试使用原始会话密钥解密数据
@@ -99,12 +100,12 @@ const CryptoValidator = {
       console.groupEnd();
       return result;
       
-    } catch (error) {
+    } catch (error: any) { // 添加类型断言
       console.error('❌ 验证过程出错:', error);
       console.groupEnd();
       return {
         success: false,
-        error: error.message
+        error: error.message || '未知错误'
       };
     }
   },
@@ -157,12 +158,12 @@ const CryptoValidator = {
         paddingCount: hasPadding ? encryptedStr.split('').filter(c => c === '=').length : 0,
         diagnosis
       };
-    } catch (error) {
+    } catch (error: any) { // 添加类型断言
       console.error('❌ 格式验证失败:', error);
       console.groupEnd();
       return {
         success: false,
-        error: error.message
+        error: error.message || '未知错误'
       };
     }
   }

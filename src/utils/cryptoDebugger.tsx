@@ -1,7 +1,21 @@
-import JSEncrypt from 'jsencrypt';
+// 移除未使用的导入
+// import JSEncrypt from 'jsencrypt';
 import CryptoJS from 'crypto-js';
 import CryptoHybrid from './cryptoHybrid';
-import { formatToPEM } from './cryptoFormat';
+import { SERVER_PUBLIC_KEY } from './request';
+
+// 工具常量和配置
+const DEFAULT_SESSION_KEY = 'ABCDEFGHABCDEFGH';
+const DEFAULT_PUBLIC_KEY = SERVER_PUBLIC_KEY || 'MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAgMFliHCiiYlPIZ9Om8X8MnjcK9Lx4ESvRcI7gJDP18yLWEkx2ahzpOyE/gdztTXXzHoJ5dbB3NNw1q+HCyn0NUWloA1GNJJ6wT5WOsIEil8aWKAus+Rk+1jOkhHEVC7e0CTsE07iYkPkYzvS4qdR3BqFdmqg5A2I/UDdiRG8e535tMUkCdNCPffAzuxdT0A68mqc3wappLhVqhwhC2ToQzFAfCq8O+RQmZyvL6Bo4pyXAII1LXPTMUM/0jaXn8+TcjjdcGY9eaCDWuiuRcUuk6vzEvdRKuzKvarLhmpgrZWe4aTb7XCExpv7zDuq68f2X43ppvt94PFmrjt6XKjDTQIDAQAB';
+
+// 结果类型定义
+interface DebugResult<T = any> {
+  success: boolean;
+  error?: string;
+  stage?: string;
+  [key: string]: any;
+  data?: T;
+}
 
 /**
  * RSA加解密调试工具
@@ -9,353 +23,273 @@ import { formatToPEM } from './cryptoFormat';
  */
 const RSADebugger = {
   /**
-   * 逐步分析RSA加密逻辑，精确定位问题所在
+   * 获取服务器公钥（如果可用）
    */
-  analyzeRSAEncryptionFlow: (
-    aesKey: string, 
-    publicKey: string, 
-    privateKey: string
-  ) => {
-    console.group('🔍 RSA加密流程深度分析');
-    
+  getServerPublicKey(): string {
+    return DEFAULT_PUBLIC_KEY;
+  },
+
+  /**
+   * 初始化加密环境，包括设置固定密钥
+   */
+  initEncryptionEnvironment(sessionKey: string = DEFAULT_SESSION_KEY): void {
+    CryptoHybrid.configure({ 
+      useFixedKey: true, 
+      fixedKey: sessionKey
+    });
+  },
+
+  /**
+   * 用于测试的加密函数，包装了整个加密流程
+   */
+  encryptData(data: any, publicKey?: string, sessionKey?: string): DebugResult {
     try {
-      // 1. 输入参数检查
-      console.log('1️⃣ 检查输入参数');
+      const usedPublicKey = publicKey || DEFAULT_PUBLIC_KEY;
+      const usedSessionKey = sessionKey || DEFAULT_SESSION_KEY;
       
-      const aesKeyDetails = {
-        value: aesKey,
-        length: aesKey.length,
-        byteLength: new TextEncoder().encode(aesKey).length
-      };
-      console.log('AES密钥:', aesKeyDetails);
+      // 初始化加密环境
+      this.initEncryptionEnvironment(usedSessionKey);
       
-      if (aesKey.length !== 16) {
-        console.warn('⚠️ AES密钥长度不是标准的16字节');
-      }
+      // 执行加密
+      const result = CryptoHybrid.hybrid.prepareEncryptedData(data, usedPublicKey, usedSessionKey);
       
-      // 2. 密钥对验证
-      console.log('2️⃣ 验证RSA密钥对');
-      
-      // 使用一个简单消息验证密钥对
-      const testMessage = 'RSATestMessage';
-      
-      // 格式化密钥
-      const formattedPublicKey = formatToPEM(publicKey, 'PUBLIC KEY');
-      const formattedPrivateKey = formatToPEM(privateKey, 'PRIVATE KEY');
-      
-      // 创建加密实例
-      const publicEncryptor = new JSEncrypt();
-      publicEncryptor.setPublicKey(formattedPublicKey);
-      
-      const privateDecryptor = new JSEncrypt();
-      privateDecryptor.setPrivateKey(formattedPrivateKey);
-      
-      // 测试加密解密
-      const testEncrypted = publicEncryptor.encrypt(testMessage);
-      const testDecrypted = privateDecryptor.decrypt(testEncrypted);
-      
-      const keyPairValid = testMessage === testDecrypted;
-      console.log('密钥对加解密测试:', keyPairValid ? '✅ 成功' : '❌ 失败');
-      
-      if (!keyPairValid) {
-        console.error('RSA密钥对无法正确加解密');
-        console.log('- 原始消息:', testMessage);
-        console.log('- 解密结果:', testDecrypted);
-        // 提前返回
-        console.groupEnd();
-        return {
-          success: false,
-          stage: 'key-pair-validation',
-          error: '密钥对无效'
-        };
-      }
-      
-      // 3. 检查Base64编码过程
-      console.log('3️⃣ 检查Base64编码过程');
-      
-      // 直接使用密钥
-      const directEncrypted = publicEncryptor.encrypt(aesKey);
-      console.log('直接加密AES密钥:', directEncrypted);
-      
-      // CryptoHybrid实现中的Base64编码
-      const base64Key = CryptoHybrid.common.utf8ToBase64(aesKey);
-      console.log('Base64编码AES密钥:', base64Key);
-      
-      // 使用Base64编码后加密 (业务逻辑中的流程)
-      const base64Encrypted = publicEncryptor.encrypt(base64Key);
-      console.log('加密Base64编码后的密钥:', base64Encrypted);
-      
-      // 4. 检查解密过程
-      console.log('4️⃣ 检查解密过程');
-      
-      // 解密直接加密的密钥
-      const directDecrypted = privateDecryptor.decrypt(directEncrypted);
-      const directSuccess = directDecrypted === aesKey;
-      console.log('直接加密方式解密:', directSuccess ? '✅ 成功' : '❌ 失败');
-      console.log('- 解密结果:', directDecrypted);
-      
-      // 解密Base64编码后加密的密钥
-      const base64Decrypted = privateDecryptor.decrypt(base64Encrypted);
-      const base64Success = base64Decrypted === base64Key;
-      console.log('Base64编码方式解密:', base64Success ? '✅ 成功' : '❌ 失败');
-      console.log('- 解密结果:', base64Decrypted);
-      
-      if (base64Success) {
-        // 解码Base64
-        try {
-          const decodedKey = CryptoHybrid.common.base64ToUtf8(base64Decrypted);
-          const decodeSuccess = decodedKey === aesKey;
-          console.log('Base64解码:', decodeSuccess ? '✅ 成功' : '❌ 失败');
-          console.log('- 解码结果:', decodedKey);
-        } catch (e) {
-          console.error('Base64解码失败:', e);
-        }
-      }
-      
-      // 5. 与业务代码流程对比
-      console.log('5️⃣ 业务代码流程验证');
-      
-      // 使用CryptoHybrid模块的完整业务流程
-      const businessResult = (() => {
-        // 使用相同的密钥设定
-        CryptoHybrid.configure({ 
-          useFixedKey: true, 
-          fixedKey: aesKey
-        });
-        
-        // 测试数据
-        const sampleData = { test: "sample" };
-        
-        // 业务加密过程
-        const { encryptedAESKey, encryptedData, sessionKey } = 
-          CryptoHybrid.hybrid.prepareEncryptedData(sampleData, publicKey);
-        
-        // 验证加密结果
-        return {
-          encryptedAESKey,
-          sessionKey,
-          match: sessionKey === aesKey
-        };
-      })();
-      
-      console.log('业务流程加密结果:', businessResult);
-      console.log('业务密钥匹配:', businessResult.match ? '✅ 是' : '❌ 否');
-      
-      // 尝试解密业务流程中加密的密钥
-      const businessDecrypted = privateDecryptor.decrypt(businessResult.encryptedAESKey);
-      console.log('业务加密的密钥解密结果:', businessDecrypted);
-      
-      // 检查解密后的base64密钥是否能解码为原始密钥
-      if (businessDecrypted) {
-        try {
-          const decodedBusinessKey = CryptoHybrid.common.base64ToUtf8(businessDecrypted);
-          const businessKeyMatch = decodedBusinessKey === businessResult.sessionKey;
-          console.log('业务密钥完整解密流程:', businessKeyMatch ? '✅ 成功' : '❌ 失败');
-          console.log('- 解码后的密钥:', decodedBusinessKey);
-        } catch (e) {
-          console.error('解码业务密钥失败:', e);
-        }
-      }
-      
-      // 6. 诊断与修复建议
-      console.log('6️⃣ 诊断与修复建议');
-      
-      const issues = [];
-      const recommendations = [];
-      
-      if (!keyPairValid) {
-        issues.push('RSA密钥对无效');
-        recommendations.push('重新生成匹配的RSA密钥对');
-      }
-      
-      if (!directSuccess) {
-        issues.push('直接RSA加密/解密失败');
-        recommendations.push('检查RSA实现，确保密钥格式正确');
-      }
-      
-      if (!base64Success) {
-        issues.push('Base64编码的密钥加密/解密失败');
-        recommendations.push('检查UTF-8编码和Base64转换过程');
-      }
-      
-      if (businessDecrypted !== base64Key) {
-        issues.push('业务流程加密的密钥解密结果不符合预期');
-        recommendations.push('检查业务代码中的密钥处理流程');
-        recommendations.push('确保加密前的Base64编码与解密后的解码过程匹配');
-      }
-      
-      if (issues.length === 0) {
-        console.log('✅ 未发现问题，RSA加解密流程正常');
-      } else {
-        console.log('❌ 发现问题:');
-        issues.forEach(issue => console.log(`- ${issue}`));
-        console.log('建议修复:');
-        recommendations.forEach(rec => console.log(`- ${rec}`));
-      }
-      
-      console.groupEnd();
       return {
-        success: issues.length === 0,
-        directEncryption: directSuccess,
-        base64Encryption: base64Success,
-        businessFlow: businessDecrypted === base64Key,
-        issues,
-        recommendations
+        success: true,
+        ...result,
+        request: {
+          encryptedAESKey: result.encryptedAESKey,
+          encryptedData: result.encryptedData
+        }
       };
-      
-    } catch (error) {
-      console.error('分析过程发生错误:', error);
-      console.groupEnd();
+    } catch (error: any) { // 添加类型断言
+      console.error('加密数据失败:', error);
       return {
         success: false,
-        error: error.message
+        error: error.message,
+        stage: 'encryption'
       };
     }
   },
   
   /**
-   * 验证完整的混合加密流程
+   * 解密数据 - 仅限AES部分
    */
-  testHybridEncryptionFlow: (data: any, publicKey: string, privateKey: string) => {
-    console.group('🔄 混合加密流程测试');
+  decryptData(encryptedData: string, sessionKey: string): DebugResult {
     try {
-      // 1. 记录初始参数
-      console.log('测试数据:', data);
+      const result = CryptoHybrid.aes.decrypt(encryptedData, sessionKey);
       
-      // 2. 配置CryptoHybrid使用固定密钥
-      CryptoHybrid.configure({ 
-        useFixedKey: true, 
-        fixedKey: 'ABCDEFGHABCDEFGH'
-      });
+      return {
+        success: result.success,
+        data: result.data,
+        error: result.error
+      };
+    } catch (error: any) { // 添加类型断言
+      return {
+        success: false,
+        error: error.message,
+        stage: 'decryption'
+      };
+    }
+  },
+  
+  /**
+   * 快速测试加密流程 - 集成并简化版本
+   */
+  quickTest(publicKey?: string): DebugResult {
+    console.group('🚀 加密系统快速测试');
+    
+    try {
+      // 1. 测试数据和密钥
+      const testData = { username: 'test', password: 'password123' };
+      const sessionKey = DEFAULT_SESSION_KEY;
+      const serverPublicKey = publicKey || DEFAULT_PUBLIC_KEY;
+      
+      console.log('测试数据:', testData);
+      console.log('会话密钥:', sessionKey);
+      console.log('公钥:', serverPublicKey.substring(0, 20) + '...');
+      
+      // 2. 初始化加密环境
+      this.initEncryptionEnvironment(sessionKey);
       
       // 3. 执行加密
-      console.log('1️⃣ 执行加密流程');
-      const { encryptedAESKey, encryptedData, sessionKey } = 
-        CryptoHybrid.hybrid.prepareEncryptedData(data, publicKey);
+      console.log('\n1️⃣ 执行加密流程...');
+      const encryptResult = this.encryptData(testData, serverPublicKey, sessionKey);
       
+      if (!encryptResult.success) {
+        console.error('❌ 加密失败:', encryptResult.error);
+        console.groupEnd();
+        return encryptResult;
+      }
+      
+      const { encryptedAESKey, encryptedData } = encryptResult;
       console.log('加密结果:');
-      console.log('- 会话密钥:', sessionKey);
-      console.log('- 加密的AES密钥:', encryptedAESKey);
-      console.log('- 加密的数据:', encryptedData);
+      console.log('- AES密钥(加密):', encryptedAESKey.substring(0, 20) + '...');
+      console.log('- 数据(加密):', encryptedData.substring(0, 20) + '...');
       
-      // 4. RSA解密AES密钥
-      console.log('2️⃣ 使用RSA私钥解密AES密钥');
-      const privateDecryptor = new JSEncrypt();
-      privateDecryptor.setPrivateKey(formatToPEM(privateKey, 'PRIVATE KEY'));
-      
-      const decryptedBase64Key = privateDecryptor.decrypt(encryptedAESKey);
-      console.log('解密的Base64密钥:', decryptedBase64Key);
-      
-      if (!decryptedBase64Key) {
-        console.error('❌ RSA解密失败');
-        console.groupEnd();
-        return { 
-          success: false, 
-          stage: 'rsa-decryption',
-          error: 'RSA解密失败' 
-        };
-      }
-      
-      // 5. 解码Base64密钥
-      console.log('3️⃣ 解码Base64密钥');
-      try {
-        const decodedKey = CryptoHybrid.common.base64ToUtf8(decryptedBase64Key);
-        console.log('解码后的密钥:', decodedKey);
-        console.log('原始会话密钥:', sessionKey);
-        
-        const keyMatch = decodedKey === sessionKey;
-        console.log('密钥匹配:', keyMatch ? '✅ 是' : '❌ 否');
-        
-        if (!keyMatch) {
-          console.error('❌ 解码后的密钥与原始会话密钥不匹配');
-          console.groupEnd();
-          return { 
-            success: false, 
-            stage: 'key-match',
-            error: '密钥不匹配' 
-          };
-        }
-      } catch (e) {
-        console.error('❌ Base64解码失败:', e);
-        console.groupEnd();
-        return { 
-          success: false, 
-          stage: 'base64-decoding',
-          error: e.message 
-        };
-      }
-      
-      // 6. AES解密数据
-      console.log('4️⃣ 使用AES密钥解密数据');
-      const decryptResult = CryptoHybrid.aes.decrypt(encryptedData, sessionKey);
+      // 4. 测试AES解密
+      console.log('\n2️⃣ 测试AES解密...');
+      const decryptResult = this.decryptData(encryptedData, sessionKey);
       
       if (!decryptResult.success) {
-        console.error('❌ AES解密失败:', decryptResult.error);
+        console.error('❌ 解密失败:', decryptResult.error);
         console.groupEnd();
-        return { 
-          success: false, 
-          stage: 'aes-decryption',
-          error: decryptResult.error 
+        return {
+          ...encryptResult,
+          decryptSuccess: false,
+          decryptError: decryptResult.error
         };
       }
       
       console.log('解密数据:', decryptResult.data);
       
-      // 7. 验证解密结果
-      const originalStr = JSON.stringify(data);
+      // 5. 验证数据匹配
+      const originalStr = JSON.stringify(testData);
       const decryptedStr = JSON.stringify(decryptResult.data);
       const dataMatch = originalStr === decryptedStr;
       
       console.log('数据匹配:', dataMatch ? '✅ 是' : '❌ 否');
       
       if (!dataMatch) {
-        console.log('- 原始数据:', originalStr);
-        console.log('- 解密数据:', decryptedStr);
-        console.groupEnd();
-        return { 
-          success: false, 
-          stage: 'data-match',
-          error: '数据不匹配' 
-        };
+        console.log('- 原始:', originalStr);
+        console.log('- 解密:', decryptedStr);
       }
       
-      // 8. 完整流程通过
-      console.log('✅ 混合加密流程测试通过');
+      // 6. 生成测试报告
+      const testReport = {
+        encryptionWorking: true,
+        decryptionWorking: decryptResult.success,
+        dataIntegrity: dataMatch,
+        performance: {
+          encryptedKeySizeBytes: encryptedAESKey.length,
+          encryptedDataSizeBytes: encryptedData.length
+        }
+      };
+      
+      console.log('\n🔍 测试报告:', testReport);
+      
+      // 7. 提供实用信息
+      console.log('\n💡 使用提示:');
+      console.log('- 复制加密数据: copyLastRequest()');
+      console.log('- 测试登录请求: loginTest("username", "password")');
+      
       console.groupEnd();
       return {
         success: true,
+        encryptSuccess: true,
+        decryptSuccess: decryptResult.success,
+        dataMatch,
         encryptedAESKey,
         encryptedData,
-        sessionKey
+        sessionKey,
+        decryptedData: decryptResult.data,
+        testReport
+      };
+    } catch (error: any) { // 添加类型断言
+      console.error('测试过程中发生错误:', error);
+      console.groupEnd();
+      return {
+        success: false,
+        error: error.message,
+        stage: 'test_execution'
+      };
+    }
+  },
+  
+  /**
+   * 生成登录API请求
+   */
+  loginTest(username: string, password: string): DebugResult {
+    console.group('🔐 登录加密测试');
+    
+    try {
+      // 1. 加密登录数据
+      const loginData = { username, password };
+      const encryptResult = this.encryptData(loginData);
+      
+      if (!encryptResult.success) {
+        console.error('加密失败:', encryptResult.error);
+        console.groupEnd();
+        return encryptResult;
+      }
+      
+      // 2. 生成API请求
+      const request = {
+        encryptedAESKey: encryptResult.encryptedAESKey,
+        encryptedData: encryptResult.encryptedData
       };
       
-    } catch (error) {
-      console.error('测试过程发生错误:', error);
+      // 3. 生成curl命令
+      const curlCommand = this.generateCurlCommand('/user/login', request);
+      console.log('API请求体:', request);
+      console.log('测试命令:', curlCommand);
+      
+      // 4. 尝试复制到剪贴板
+      this.copyToClipboard(curlCommand, '登录命令');
+      
       console.groupEnd();
-      return { 
-        success: false, 
-        stage: 'unknown',
-        error: error.message 
+      return {
+        success: true,
+        sessionKey: encryptResult.sessionKey,
+        encryptedAESKey: encryptResult.encryptedAESKey,
+        encryptedData: encryptResult.encryptedData,
+        request,
+        curlCommand
+      };
+    } catch (error: any) { // 添加类型断言
+      console.error('登录测试失败:', error);
+      console.groupEnd();
+      return {
+        success: false,
+        error: error.message,
+        stage: 'login_test'
       };
     }
   },
-
+  
   /**
-   * 从rsaPrivateKeyChecker合并: 测试加密后AES密钥能否用私钥解密
+   * 生成curl命令
    */
-  canDecryptEncryptedAESKey: (encryptedAESKey: string, privateKey: string) => {
-    const decryptor = new JSEncrypt();
-    decryptor.setPrivateKey(formatToPEM(privateKey, 'PRIVATE KEY'));
-    const decryptedBase64Key = decryptor.decrypt(encryptedAESKey);
-    if (!decryptedBase64Key) {
-      return { success: false, error: '无法解密AES密钥' };
-    }
-    return { success: true, base64Key: decryptedBase64Key };
+  generateCurlCommand(endpoint: string, data: any): string {
+    const baseUrl = 'http://218.199.69.63:39600';
+    const url = `${baseUrl}${endpoint}`;
+    
+    return `curl -X POST "${url}" \\
+  -H "Content-Type: application/json" \\
+  -H "x-encrypted-request: true" \\
+  -d '${JSON.stringify(data)}'`;
   },
-
+  
   /**
-   * 从cryptoDebug合并: 验证两种Base64编码实现之间的一致性
+   * 复制内容到剪贴板
    */
+  copyToClipboard(text: string, description: string = '内容'): boolean {
+    try {
+      if (typeof navigator !== 'undefined' && navigator.clipboard) {
+        navigator.clipboard.writeText(text)
+          .then(() => console.log(`✅ ${description}已复制到剪贴板`))
+          .catch(err => console.error(`❌ 复制失败:`, err));
+        return true;
+      } else {
+        console.warn('浏览器不支持Clipboard API');
+        return false;
+      }
+    } catch (e: any) { // 添加类型断言
+      console.error('复制失败:', e);
+      return false;
+    }
+  },
+  
+  // 保留其他功能函数，但标记为已禁用
+  testHybridEncryptionFlow: () => ({
+    success: false, 
+    error: '该功能已禁用，请使用quickTest替代'
+  }),
+  
+  canDecryptEncryptedAESKey: () => ({
+    success: false,
+    error: '私钥解密功能已禁用'
+  }),
+  
   compareBase64Implementations: (str: string): boolean => {
     // 方法1: CryptoJS实现
     const cryptoJSImplementation = (() => {
@@ -379,434 +313,291 @@ const RSADebugger = {
     return match;
   },
   
-  /**
-   * 从testUtils合并: 使用与业务代码完全相同的方式加密数据
-   * @param data 要加密的数据
-   * @param publicKey 公钥（可选）
-   */
-  encryptWithBusinessLogic: (data: any, publicKey?: string) => {
-    // 如果没有提供公钥，使用默认的服务器公钥
-    let serverPublicKey = publicKey;
-    if (!serverPublicKey) {
-      try {
-        // 尝试从request.tsx导入SERVER_PUBLIC_KEY
-        const { SERVER_PUBLIC_KEY } = require('./request');
-        serverPublicKey = SERVER_PUBLIC_KEY;
-      } catch (error) {
-        // 如果导入失败，使用默认的硬编码值
-        serverPublicKey = 'MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAlAz0N/LGPJ9EsJ8qVCgDWXbNBeuUPQcil0fIUBvNOYN80mbgeSSlHeYbRc2Z/GfV2zFWlEprTFXyv9h3GyvrRnx4xtLL2HiX2MQcR97h1bM4BgJeexvbjNs0YlZIck8r83Ar88FzY6wKda5NUzNcbRRm7gwgiDirCZnL+Byl7S0WVGuMpsCci5p49qs/L+/+biF5Hs5A+8+7yI+WN7NXAoaaCvufEOJdmUweCMlEqL0EXdQTkLKYB37kaWHbQSdA1r8XMHWBB8yJaj8yXWWAt+rGuKuCa10u3Gr8ckH5tA7UNU8dwVwMw229HcwNCBQzqWZbSoY+X91QGO6yymCkUQIDAQAB';
-      }
-    }
-    
-    // 启用固定密钥模式
-    CryptoHybrid.configure({ 
-      useFixedKey: true, 
-      fixedKey: 'ABCDEFGHABCDEFGH'
-    });
-    
-    // 固定会话密钥
-    const sessionKey = 'ABCDEFGHABCDEFGH';
-    
-    // 加密AES密钥
-    const base64Key = CryptoHybrid.common.utf8ToBase64(sessionKey);
-    const encryptedAESKey = CryptoHybrid.keys.encryptWithRSA(base64Key, serverPublicKey);
-    
-    // 加密数据
-    const encryptedData = CryptoHybrid.aes.encrypt(data, sessionKey);
-    
-    return {
-      encryptedAESKey,
-      encryptedData,
-      sessionKey,
-      request: {
-        encryptedAESKey,
-        encryptedData
-      }
-    };
+  // 修改为使用新的encryptData
+  encryptWithBusinessLogic: function(data: any, publicKey?: string): DebugResult {
+    return this.encryptData(data, publicKey);
   },
 
-  /**
-   * 便捷的登录测试工具
-   */
-  loginTest: (username: string, password: string) => {
-    // 直接使用本地存储的公钥
-    let publicKey;
+  // 测试并发加密
+  testConcurrentEncryption: async (data: any): Promise<DebugResult> => {
+    console.group('🔄 并发加密测试');
     
     try {
-      // 尝试从request.tsx导入SERVER_PUBLIC_KEY
-      const { SERVER_PUBLIC_KEY } = require('./request');
-      publicKey = SERVER_PUBLIC_KEY;
-      console.log('使用本地存储的服务器公钥');
-    } catch (error) {
-      console.warn('无法导入服务器公钥，使用默认值');
-      publicKey = 'MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAlAz0N/LGPJ9EsJ8qVCgDWXbNBeuUPQcil0fIUBvNOYN80mbgeSSlHeYbRc2Z/GfV2zFWlEprTFXyv9h3GyvrRnx4xtLL2HiX2MQcR97h1bM4BgJeexvbjNs0YlZIck8r83Ar88FzY6wKda5NUzNcbRRm7gwgiDirCZnL+Byl7S0WVGuMpsCci5p49qs/L+/+biF5Hs5A+8+7yI+WN7NXAoaaCvufEOJdmUweCMlEqL0EXdQTkLKYB37kaWHbQSdA1r8XMHWBB8yJaj8yXWWAt+rGuKuCa10u3Gr8ckH5tA7UNU8dwVwMw229HcwNCBQzqWZbSoY+X91QGO6yymCkUQIDAQAB';
-    }
-    
-    // 准备登录数据
-    const loginData = { username, password };
-    
-    // 使用业务逻辑加密
-    const result = RSADebugger.encryptWithBusinessLogic(loginData, publicKey);
-    
-    // 准备curl命令
-    const curlCommand = `curl -X POST "http://218.199.69.63:39600/user/login" \\
-    -H "Content-Type: application/json" \\
-    -H "x-encrypted-request: true" \\
-    -d '${JSON.stringify(result.request)}'`;
-    
-    console.group('🔐 登录测试工具');
-    console.log('登录数据:', loginData);
-    console.log('加密结果:', result);
-    console.log('测试命令:', curlCommand);
-    console.groupEnd();
-    
-    // 自动复制到剪贴板
-    try {
-      navigator.clipboard.writeText(curlCommand)
-        .then(() => console.log('✅ 测试命令已复制到剪贴板'))
-        .catch(err => console.error('❌ 复制失败:', err));
-    } catch (e) {
-      // 忽略错误
-    }
-    
-    return result;
-  },
-
-  /**
-   * 从cryptoDebug合并: 测试多个进程中密钥的一致性
-   */
-  testConcurrentEncryption: async (data: any) => {
-    // 配置为使用固定密钥
-    CryptoHybrid.configure({ 
-      useFixedKey: true, 
-      fixedKey: 'ABCDEFGHABCDEFGH'
-    });
-    
-    // 多次加密同样的数据
-    const results = [];
-    
-    for (let i = 0; i < 5; i++) {
-      // 生成公钥 - 测试用固定公钥
-      const mockPublicKey = 'MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAlAz0N/LGPJ9EsJ8qVCgDWXbNBeuUPQcil0fIUBvNOYN80mbgeSSlHeYbRc2Z/GfV2zFWlEprTFXyv9h3GyvrRnx4xtLL2HiX2MQcR97h1bM4BgJeexvbjNs0YlZIck8r83Ar88FzY6wKda5NUzNcbRRm7gwgiDirCZnL+Byl7S0WVGuMpsCci5p49qs/L+/+biF5Hs5A+8+7yI+WN7NXAoaaCvufEOJdmUweCMlEqL0EXdQTkLKYB37kaWHbQSdA1r8XMHWBB8yJaj8yXWWAt+rGuKuCa10u3Gr8ckH5tA7UNU8dwVwMw229HcwNCBQzqWZbSoY+X91QGO6yymCkUQIDAQAB';
-      
-      // 使用业务代码加密
-      const encryptResult = CryptoHybrid.hybrid.prepareEncryptedData(data, mockPublicKey);
-      
-      // 验证结果
-      const decryptResult = CryptoHybrid.aes.decrypt(encryptResult.encryptedData, encryptResult.sessionKey);
-      
-      results.push({
-        run: i + 1,
-        encryptedAESKey: encryptResult.encryptedAESKey,
-        encryptedData: encryptResult.encryptedData,
-        sessionKey: encryptResult.sessionKey,
-        decryptResult,
-        success: decryptResult.success
-      });
-      
-      // 短暂延迟，模拟实际网络环境
-      await new Promise(resolve => setTimeout(resolve, 100));
-    }
-    
-    // 检查所有结果
-    const allSucceeded = results.every(r => r.success);
-    const allSameKey = results.every(r => r.sessionKey === results[0].sessionKey);
-    const allSameEncryptedKey = results.every(r => r.encryptedAESKey === results[0].encryptedAESKey);
-    
-    console.group('🔄 并发加密一致性测试');
-    console.log('所有请求加密成功:', allSucceeded ? '✅ 是' : '❌ 否');
-    console.log('所有请求使用相同密钥:', allSameKey ? '✅ 是' : '❌ 否');
-    console.log('所有请求产生相同加密密钥:', allSameEncryptedKey ? '✅ 是' : '❌ 否');
-    console.log('详细结果:', results);
-    console.groupEnd();
-    
-    return {
-      allSucceeded,
-      allSameKey,
-      allSameEncryptedKey,
-      results
-    };
-  },
-  
-  /**
-   * 从cryptoDebug合并: 验证密钥在不同格式下是否生成相同加密结果
-   */
-  verifyKeyFormats: (data: any) => {
-    const testKey = 'ABCDEFGHABCDEFGH'; // 16字节ASCII密钥
-    
-    // 不同格式的处理方式
-    const testModes = [
-      {
-        name: 'UTF-8字符串',
-        keyBytes: CryptoJS.enc.Utf8.parse(testKey)
-      },
-      {
-        name: 'HEX解析',
-        keyBytes: CryptoJS.enc.Hex.parse(Buffer.from(testKey).toString('hex'))
-      }
-    ];
-    
-    const encryptResults = {};
-    const decryptResults = {};
-    
-    for (const mode of testModes) {
-      // 加密测试
-      try {
-        // 加密数据
-        const encrypted = CryptoJS.AES.encrypt(
-          typeof data === 'string' ? data : JSON.stringify(data), 
-          mode.keyBytes, 
-          { mode: CryptoJS.mode.ECB, padding: CryptoJS.pad.Pkcs7 }
-        ).toString();
-        
-        encryptResults[mode.name] = encrypted;
-        
-        // 尝试解密
-        const decrypted = CryptoJS.AES.decrypt(
-          encrypted, 
-          mode.keyBytes, 
-          { mode: CryptoJS.mode.ECB, padding: CryptoJS.pad.Pkcs7 }
-        ).toString(CryptoJS.enc.Utf8);
-        
-        // 验证解密结果
-        decryptResults[mode.name] = {
-          success: true,
-          data: decrypted
-        };
-      } catch (error) {
-        encryptResults[mode.name] = `错误: ${error.message}`;
-        decryptResults[mode.name] = {
-          success: false,
-          error: error.message
-        };
-      }
-    }
-    
-    // 比较所有模式的输出是否一致
-    const encryptedValues = Object.values(encryptResults);
-    const firstValue = encryptedValues[0];
-    const allEncryptSame = encryptedValues.every(value => value === firstValue);
-    
-    console.group('🔑 密钥格式一致性测试');
-    console.log('所有格式产生相同加密结果:', allEncryptSame ? '✅ 是' : '❌ 否');
-    console.log('加密结果:', encryptResults);
-    console.log('解密结果:', decryptResults);
-    console.groupEnd();
-    
-    return {
-      allEncryptSame,
-      encryptResults,
-      decryptResults
-    };
-  },
-
-  /**
-   * 简化的测试工具 - 一键完成主要测试操作
-   */
-  quickTest: () => {
-    console.group('🚀 快速加密测试');
-    
-    try {
-      // 1. 使用默认测试数据
-      const testData = { username: 'test', password: 'password123' };
-      console.log('测试数据:', testData);
-      
-      // 2. 使用本地存储的公钥
-      let serverPublicKey;
-      try {
-        const { SERVER_PUBLIC_KEY } = require('./request');
-        serverPublicKey = SERVER_PUBLIC_KEY;
-        console.log('使用本地存储的公钥:', serverPublicKey.substring(0, 20) + '...');
-      } catch (error) {
-        console.warn('无法导入服务器公钥，使用默认值');
-        serverPublicKey = 'MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAlAz0N/LGPJ9EsJ8qVCgDWXbNBeuUPQcil0fIUBvNOYN80mbgeSSlHeYbRc2Z/GfV2zFWlEprTFXyv9h3GyvrRnx4xtLL2HiX2MQcR97h1bM4BgJeexvbjNs0YlZIck8r83Ar88FzY6wKda5NUzNcbRRm7gwgiDirCZnL+Byl7S0WVGuMpsCci5p49qs/L+/+biF5Hs5A+8+7yI+WN7NXAoaaCvufEOJdmUweCMlEqL0EXdQTkLKYB37kaWHbQSdA1r8XMHWBB8yJaj8yXWWAt+rGuKuCa10u3Gr8ckH5tA7UNU8dwVwMw229HcwNCBQzqWZbSoY+X91QGO6yymCkUQIDAQAB';
-      }
-      
-      // 3. 配置CryptoHybrid使用固定密钥
-      const sessionKey = "ABCDEFGHABCDEFGH";
+      // 初始化加密环境
       CryptoHybrid.configure({ 
         useFixedKey: true, 
-        fixedKey: sessionKey
+        fixedKey: DEFAULT_SESSION_KEY
       });
       
-      // 4. 执行加密过程
-      console.log('\n1️⃣ 执行加密流程...');
-      const { encryptedAESKey, encryptedData } = CryptoHybrid.hybrid.prepareEncryptedData(
-        testData, serverPublicKey
-      );
+      const iterations = 5;
+      console.log(`执行${iterations}次并发加密测试...`);
       
-      console.log('- 加密后的AES密钥:', encryptedAESKey);
-      console.log('- 加密后的数据:', encryptedData.substring(0, 30) + '...');
+      // 多次加密同样的数据
+      const promises = Array(iterations).fill(0).map(async (_, i) => {
+        // 使用公钥加密
+        try {
+          const result = CryptoHybrid.hybrid.prepareEncryptedData(
+            data, 
+            DEFAULT_PUBLIC_KEY, 
+            DEFAULT_SESSION_KEY
+          );
+          
+          // 解密数据验证
+          const decryptResult = CryptoHybrid.aes.decrypt(
+            result.encryptedData, 
+            result.sessionKey
+          );
+          
+          return {
+            run: i + 1,
+            success: decryptResult.success,
+            encryptedAESKey: result.encryptedAESKey,
+            encryptedData: result.encryptedData,
+            sessionKey: result.sessionKey
+          };
+        } catch (error: any) { // 添加类型断言
+          return {
+            run: i + 1,
+            success: false,
+            error: error.message
+          };
+        }
+      });
       
-      // 5. 通知测试限制
-      console.log('\n2️⃣ RSA解密测试(已禁用)');
-      console.log('⚠️ 注意：私钥解密测试已禁用，因为私钥仅在服务器端存在');
+      // 等待所有任务完成
+      const results = await Promise.all(promises);
       
-      // 6. 验证AES加解密
-      console.log('\n3️⃣ 测试AES加解密功能...');
-      const aesResult = CryptoHybrid.aes.decrypt(encryptedData, sessionKey);
+      // 分析结果
+      const allSuccess = results.every(r => r.success);
+      const allSameKey = results.every(r => r.sessionKey === results[0].sessionKey);
+      const allSameEncryptedKey = results.every(r => r.encryptedAESKey === results[0].encryptedAESKey);
       
-      if (aesResult.success) {
-        console.log('✅ AES解密成功');
-        console.log('- 解密数据:', aesResult.data);
-        
-        // 验证数据是否正确
-        const originalStr = JSON.stringify(testData);
-        const decryptedStr = JSON.stringify(aesResult.data);
-        const dataMatch = originalStr === decryptedStr;
-        
-        console.log('- 数据匹配:', dataMatch ? '✅ 是' : '❌ 否');
-      } else {
-        console.error('❌ AES解密失败:', aesResult.error);
-      }
-      
-      // 7. 测试结果
-      console.log('\n🔍 测试结果汇总:');
-      console.log('- 公钥可用:', !!serverPublicKey ? '✅ 是' : '❌ 否');
-      console.log('- AES加密成功:', !!encryptedData ? '✅ 是' : '❌ 否');
-      console.log('- AES解密验证:', aesResult.success ? '✅ 通过' : '❌ 失败');
-      console.log('- RSA测试:', '⚠️ 已禁用（需服务器验证）');
+      // 输出结果摘要
+      console.log('测试结果摘要:');
+      console.log('- 全部加密成功:', allSuccess ? '✅ 是' : '❌ 否');
+      console.log('- 使用相同会话密钥:', allSameKey ? '✅ 是' : '❌ 否');
+      console.log('- 生成相同加密密钥:', allSameEncryptedKey ? '✅ 是' : '❌ 否');
       
       console.groupEnd();
       return {
-        success: aesResult.success,
-        publicKey: serverPublicKey,
-        encryptedData,
-        encryptedAESKey,
-        sessionKey,
-        aesTestResult: aesResult
+        success: allSuccess,
+        allSameKey,
+        allSameEncryptedKey,
+        results
       };
-    } catch (error) {
-      console.error('测试过程中发生错误:', error);
+      
+    } catch (error: any) { // 添加类型断言
+      console.error('并发测试失败:', error);
       console.groupEnd();
       return {
         success: false,
-        error: error.message
+        error: error.message,
+        stage: 'concurrent_test'
       };
     }
   },
-
-  /**
-   * 生成登录API请求体 - 方便进行接口测试
-   */
-  prepareLoginRequest: (username: string, password: string) => {
-    // 使用本地存储的公钥
-    let publicKey;
-    
-    try {
-      const { SERVER_PUBLIC_KEY } = require('./request');
-      publicKey = SERVER_PUBLIC_KEY;
-    } catch (error) {
-      console.warn('无法导入服务器公钥，使用默认值');
-      publicKey = 'MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAlAz0N/LGPJ9EsJ8qVCgDWXbNBeuUPQcil0fIUBvNOYN80mbgeSSlHeYbRc2Z/GfV2zFWlEprTFXyv9h3GyvrRnx4xtLL2HiX2MQcR97h1bM4BgJeexvbjNs0YlZIck8r83Ar88FzY6wKda5NUzNcbRRm7gwgiDirCZnL+Byl7S0WVGuMpsCci5p49qs/L+/+biF5Hs5A+8+7yI+WN7NXAoaaCvufEOJdmUweCMlEqL0EXdQTkLKYB37kaWHbQSdA1r8XMHWBB8yJaj8yXWWAt+rGuKuCa10u3Gr8ckH5tA7UNU8dwVwMw229HcwNCBQzqWZbSoY+X91QGO6yymCkUQIDAQAB';
-    }
-    
-    // 使用业务逻辑加密
-    const result = RSADebugger.encryptWithBusinessLogic(
-      { username, password }, 
-      publicKey
-    );
-    
-    return {
-      url: 'http://218.199.69.63:39600/user/login',
-      method: 'POST',
-      headers: { 
-        'Content-Type': 'application/json',
-        'x-encrypted-request': 'true' 
-      },
-      data: result.request,
-      request: result.request,
-      curlCommand: `curl -X POST "http://218.199.69.63:39600/user/login" \\\n  -H "Content-Type: application/json" \\\n  -H "x-encrypted-request: true" \\\n  -d '${JSON.stringify(result.request)}'`
-    };
-  },
-
-  /**
-   * 从request.tsx整合: 当请求失败时自动测试RSA加解密
-   * 整合了请求中的测试功能，简化实现
-   */
-  testRequestEncryption: (
-    originalData: any, 
-    encryptedKey: string, 
-    sessionKey: string, 
-    publicKey: string, 
-    privateKey: string
-  ) => {
-    console.group('🔍 请求失败 - 自动分析加密流程');
-    
-    try {
-      // 1. 储存测试信息
-      console.log('测试数据信息:');
-      console.log('- 原始数据:', originalData);
-      console.log('- 加密的AES密钥:', encryptedKey);
-      console.log('- AES会话密钥:', sessionKey);
-      console.log('- 使用的公钥:', publicKey.substring(0, 20) + '...');
-      
-      // 2. 检查AES密钥能否被解密
-      console.log('\n1️⃣ 测试AES密钥解密...');
-      const decryptResult = RSADebugger.canDecryptEncryptedAESKey(encryptedKey, privateKey);
-      
-      if (decryptResult.success) {
-        console.log('✅ AES密钥解密成功');
-        console.log('解密后的Base64密钥:', decryptResult.base64Key);
-        
-        // 3. 解码Base64密钥
-        try {
-          const decodedKey = CryptoHybrid.common.base64ToUtf8(decryptResult.base64Key);
-          const keyMatch = decodedKey === sessionKey;
-          console.log('\n2️⃣ 解码Base64密钥...');
-          console.log('解码结果:', keyMatch ? '✅ 匹配' : '❌ 不匹配');
-          console.log('- 原始密钥:', sessionKey);
-          console.log('- 解码密钥:', decodedKey);
-          
-          // 4. 比对与原始AES密钥
-          if (!keyMatch) {
-            console.warn('⚠️ 解码后的密钥与会话密钥不匹配，可能是编码问题');
-          }
-        } catch (error) {
-          console.error('❌ Base64解码失败:', error);
-        }
-      } else {
-        console.error('❌ 私钥无法解密AES密钥:', decryptResult.error);
-      }
-      
-      // 5. 执行全面诊断
-      console.log('\n3️⃣ 执行完整RSA分析...');
-      setTimeout(() => {
-        RSADebugger.analyzeRSAEncryptionFlow(sessionKey, publicKey, privateKey);
-      }, 0);
-      
-    } catch (error) {
-      console.error('测试过程出错:', error);
-    }
-    
-    console.groupEnd();
+  
+  // 不再提供测试私钥
+  getTestPrivateKey: () => {
+    console.warn('⚠️ 私钥已禁用，私钥应只存在于服务器端');
+    return null;
   },
   
-  /**
-   * 修改后不再提供默认测试私钥
-   */
-  getTestPrivateKey: () => {
-    console.warn('⚠️ 警告：测试私钥功能已禁用。在生产环境中，私钥应只在服务器端存在。');
-    return null;
+  // 准备登录请求
+  prepareLoginRequest: function(username: string, password: string): DebugResult {
+    try {
+      // 使用登录测试函数
+      const loginResult = this.loginTest(username, password);
+      
+      if (!loginResult.success) {
+        return loginResult;
+      }
+      
+      // 构建API请求参数
+      return {
+        success: true,
+        url: 'http://218.199.69.63:39600/user/login',
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'x-encrypted-request': 'true' 
+        },
+        data: loginResult.request,
+        request: loginResult.request,
+        curlCommand: loginResult.curlCommand
+      };
+    } catch (error: any) { // 添加类型断言
+      return {
+        success: false,
+        error: error.message,
+        stage: 'prepare_login_request'
+      };
+    }
+  },
+  
+  // 测试请求加密 - 简化版
+  testRequestEncryption: function(
+    originalData: any,
+    encryptedKey: string,
+    sessionKey: string
+  ): DebugResult {
+    console.group('🔍 请求加密调试');
+    
+    try {
+      console.log('原始数据:', originalData);
+      console.log('会话密钥:', sessionKey);
+      console.log('加密AES密钥:', encryptedKey.substring(0, 20) + '...');
+      
+      // 仅测试AES部分
+      console.log('\n测试AES解密功能:');
+      
+      // 加密流程 - 使用已知会话密钥重新加密原始数据
+      const freshEncryptedData = CryptoHybrid.aes.encrypt(originalData, sessionKey);
+      console.log('使用同一会话密钥重新加密:', freshEncryptedData.substring(0, 20) + '...');
+      
+      // 解密测试
+      const decryptResult = CryptoHybrid.aes.decrypt(freshEncryptedData, sessionKey);
+      
+      if (decryptResult.success) {
+        console.log('✅ AES解密成功');
+        console.log('解密数据:', decryptResult.data);
+      } else {
+        console.error('❌ AES解密失败:', decryptResult.error);
+      }
+      
+      console.groupEnd();
+      return {
+        success: decryptResult.success,
+        encryptedData: freshEncryptedData,
+        decryptedData: decryptResult.data,
+        error: decryptResult.error
+      };
+    } catch (error: any) { // 添加类型断言
+      console.error('测试失败:', error);
+      console.groupEnd();
+      return {
+        success: false,
+        error: error.message,
+        stage: 'request_encryption_test'
+      };
+    }
+  },
+  
+  // 验证AES密钥格式
+  verifyKeyFormats: (data: any): DebugResult => {
+    console.group('🔑 AES密钥格式测试');
+    
+    try {
+      const testKey = DEFAULT_SESSION_KEY;
+      console.log('测试密钥:', testKey);
+      console.log('测试数据:', data);
+      
+      // 测试不同格式的AES密钥
+      const formats = [
+        {
+          name: 'UTF-8字符串',
+          key: testKey,
+          bytes: CryptoJS.enc.Utf8.parse(testKey)
+        },
+        {
+          name: 'Hex编码',
+          key: Buffer.from(testKey).toString('hex'),
+          bytes: CryptoJS.enc.Hex.parse(Buffer.from(testKey).toString('hex'))
+        },
+        {
+          name: 'Base64编码',
+          key: CryptoHybrid.common.utf8ToBase64(testKey),
+          bytes: CryptoJS.enc.Base64.parse(CryptoHybrid.common.utf8ToBase64(testKey))
+        }
+      ];
+      
+      // 对每种格式进行测试
+      const results = formats.map(format => {
+        try {
+          // 加密测试
+          const encrypted = CryptoHybrid.aes.encrypt(data, format.key);
+          
+          // 解密测试
+          const decryptResult = CryptoHybrid.aes.decrypt(encrypted, format.key);
+          
+          return {
+            format: format.name,
+            key: format.key,
+            success: decryptResult.success,
+            encryptedData: encrypted,
+            decryptedData: decryptResult.data,
+            error: decryptResult.error
+          };
+        } catch (error: any) { // 添加类型断言
+          return {
+            format: format.name,
+            key: format.key,
+            success: false,
+            error: error.message
+          };
+        }
+      });
+      
+      // 检查所有格式是否都成功
+      const allSuccessful = results.every(r => r.success);
+      console.log('所有格式测试结果:', allSuccessful ? '✅ 全部通过' : '❌ 部分失败');
+      
+      results.forEach(result => {
+        console.log(`${result.format}: ${result.success ? '✅ 成功' : '❌ 失败'}`);
+        if (!result.success) console.log(`  错误: ${result.error}`);
+      });
+      
+      console.groupEnd();
+      return {
+        success: allSuccessful,
+        formats: results
+      };
+    } catch (error: any) { // 添加类型断言
+      console.error('密钥格式测试失败:', error);
+      console.groupEnd();
+      return {
+        success: false,
+        error: error.message,
+        stage: 'key_format_test'
+      };
+    }
   }
-
 };
 
 // 全局注册调试函数 - 保持所有功能可访问
 if (typeof window !== 'undefined') {
+  // 创建相同方法的两种不同引用会增加内存使用
   window['RSADebugger'] = RSADebugger;
-  window['analyzeRSA'] = RSADebugger.analyzeRSAEncryptionFlow;
-  window['testHybridEncryption'] = RSADebugger.testHybridEncryptionFlow;
-  window['canDecryptEncryptedAESKey'] = RSADebugger.canDecryptEncryptedAESKey;
+  
+  // 精简全局注册函数列表，复用已有的bind函数
+  const bindMethod = (method, name) => {
+    window[name] = method.bind(RSADebugger);
+  };
+  
+  // 活跃方法 - 保留核心功能
+  bindMethod(RSADebugger.quickTest, 'quickTest');
+  bindMethod(RSADebugger.loginTest, 'loginTest');
+  bindMethod(RSADebugger.encryptData, 'encryptTest');
+  bindMethod(RSADebugger.prepareLoginRequest, 'prepareLogin');
+  bindMethod(RSADebugger.testRequestEncryption, 'testRequestEncryption');
+  
+  // 辅助方法 - 不需要bind的函数
   window['testBase64'] = RSADebugger.compareBase64Implementations;
-  window['encryptTest'] = RSADebugger.encryptWithBusinessLogic;
-  window['loginTest'] = RSADebugger.loginTest;
-  window['testConcurrency'] = RSADebugger.testConcurrentEncryption;
   window['testKeyFormats'] = RSADebugger.verifyKeyFormats;
-  window['quickTest'] = RSADebugger.quickTest;
-  window['prepareLogin'] = RSADebugger.prepareLoginRequest;
-  window['testRequestEncryption'] = RSADebugger.testRequestEncryption;
+  window['testConcurrency'] = RSADebugger.testConcurrentEncryption;
   window['getTestPrivateKey'] = RSADebugger.getTestPrivateKey;
+  
+  // 已禁用的方法 - 统一返回一个警告
+  const disabledMethod = (name) => {
+    return () => {
+      console.warn(`⚠️ 方法 ${name} 已禁用，请使用替代方法`);
+      return { success: false, error: `${name} 已禁用` };
+    };
+  };
+  
+  window['analyzeRSA'] = disabledMethod('analyzeRSA');
+  window['testHybridEncryption'] = disabledMethod('testHybridEncryption');
+  window['canDecryptEncryptedAESKey'] = disabledMethod('canDecryptEncryptedAESKey');
 }
 
 export default RSADebugger;
