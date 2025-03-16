@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Form, Upload, Button, message, Input } from 'antd';
 import { UploadOutlined } from '@ant-design/icons';
 import { useTranslation } from 'react-i18next';
-import axios from 'axios'; // 引入axios用于手动上传
+import { uploadPersonalFileAPI } from '@/apis/database'; // 正确导入上传API函数
 
 const RecordForm = ({ record, setRecords, records }) => {
   const [form] = Form.useForm();
@@ -46,11 +46,7 @@ const RecordForm = ({ record, setRecords, records }) => {
     formData.append('note', form.getFieldValue('ps') || '1'); // 添加备注信息
 
     try {
-      const response = await axios.post('http://218.199.69.63:39600/upload', formData, {
-        headers: {
-          token: `${localStorage.getItem('token_key')}`, // 从 localStorage 获取 token
-        },
-      });
+      const response = await uploadPersonalFileAPI(formData); // 使用从database.tsx导入的函数
 
       if (response.status === 200) {
         message.success(t('File uploaded successfully'));

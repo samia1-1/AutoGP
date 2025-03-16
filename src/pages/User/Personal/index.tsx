@@ -135,6 +135,7 @@ const Personal = () => {
     }
     setIsModalOpen2(false);
   };
+
   return (
     <div className='personal'>
       <div className="main">

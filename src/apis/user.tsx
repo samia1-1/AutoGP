@@ -1,46 +1,35 @@
 import { request } from '@/utils';
 
-// 登录 - 修改以确保正确的Content-Type和数据格式
+// 登录
 interface LoginData {
   username: string;
   password: string;
 }
-
 function loginAPI(loginData: LoginData) {
-  return request({
-    url: '/user/login',
-    method: 'post',
-    headers: {
-      'Content-Type': 'application/json'
-    },
-    data: loginData // 直接传对象，axios会自动转JSON
-  });
+  return request.post('/user/login', loginData)
+    .then(response => response)
+    .catch(error => {
+      throw error;
+    })
 }
 
 // 邮箱登录
 function emailLoginAPI(data) {
-  return request({
-    url: '/user/loginEmail',
-    method: 'post',
-    headers: {
-      'Content-Type': 'application/json'
-    },
-    data: data
-  });
+  return request.post('/user/loginEmail', data)
+    .then(response => response)
+    .catch(error => {
+      throw error;
+    })
 }
 
 // 邮箱注册
 function registerAPI(registerData) {
-  return request({
-    url: '/enrollEmail',
-    method: 'post',
-    headers: {
-      'Content-Type': 'application/json'
-    },
-    data: registerData
-  });
-}
-
+  return request.post('/enrollEmail', registerData)
+    .then(response => response)
+    .catch(error => {
+      throw error;
+    })
+};
 // 发送验证码
 function getCodeAPI(email) {
   console.log(email);
@@ -78,6 +67,5 @@ function changeUserInfo(UserInfo) {
       throw error;
     })
 }
-
-export { registerAPI, getCodeAPI, loginAPI, emailLoginAPI, getUserInfoAPI, revisePasswordAPI, changeUserInfo }
+export { registerAPI,getCodeAPI, loginAPI,emailLoginAPI, getUserInfoAPI, revisePasswordAPI, changeUserInfo }
 

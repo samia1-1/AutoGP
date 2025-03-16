@@ -193,48 +193,46 @@ export const aesEncrypt = (data: any, key: string): string => {
 export const aesDecrypt = (ciphertext: string, key: string): {success: boolean; data?: any; error?: string} => {
   try {
     log('AES解密开始');
-    
-    // 确保密钥格式正确
     const keyBytes = CryptoJS.enc.Utf8.parse(key);
-    
-    // 解密
     const decrypted = CryptoJS.AES.decrypt(ciphertext, keyBytes, {
       mode: CryptoJS.mode.ECB,
       padding: CryptoJS.pad.Pkcs7
     });
-    
-    // 转换为UTF-8字符串
     const decryptedString = decrypted.toString(CryptoJS.enc.Utf8);
     
     if (!decryptedString) {
-      return {
-        success: false,
-        error: '解密结果为空'
-      };
+      return { success: false, error: '解密结果为空' };
     }
     
-    // 尝试解析JSON
-    try {
-      const parsedData = JSON.parse(decryptedString);
-      log('AES解密完成(JSON)');
-      return {
-        success: true,
-        data: parsedData
-      };
-    } catch (e) {
-      // 不是JSON，直接返回字符串
-      log('AES解密完成(非JSON)');
-      return {
-        success: true,
-        data: decryptedString
-      };
+    let resultData: any = decryptedString;
+    
+    // 如果解密后字符串以引号包裹，则尝试先解除外层引号再解析
+    if (resultData.startsWith('"') && resultData.endsWith('"')) {
+      try {
+        const unescaped = JSON.parse(resultData);
+        // 如果解除后又是JSON格式的字符串，尝试再次解析
+        if (typeof unescaped === 'string' && unescaped.trim().startsWith('{') && unescaped.trim().endsWith('}')) {
+          resultData = JSON.parse(unescaped);
+        } else {
+          resultData = unescaped;
+        }
+      } catch (e) {
+        // 解析失败则保留原始结果
+      }
+    } else {
+      // 尝试解析为JSON对象
+      try {
+        resultData = JSON.parse(resultData);
+      } catch (e) {
+        // 如果解析失败，则认为结果为普通字符串
+      }
     }
-  } catch (error: any) { // 添加类型断言
+    
+    log('AES解密完成', resultData);
+    return { success: true, data: resultData };
+  } catch (error: any) {
     console.error('AES解密失败:', error);
-    return {
-      success: false,
-      error: error.message || '未知错误'
-    };
+    return { success: false, error: error.message || '未知错误' };
   }
 };
 
