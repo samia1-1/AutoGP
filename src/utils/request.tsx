@@ -433,7 +433,6 @@ request.interceptors.response.use((response) => {
   console.log("响应数据:", response.data);
   try {
     const contentType = response.headers['content-type'] || '';
-    const isConvertedFromGet = response.config?.headers?.['x-converted-from-get'] === 'true';
     const requiresBinaryDecryption = response.config?.headers?.['x-binary-response-decryption'] === 'true';
     
     // 判断是否是二进制响应
@@ -464,7 +463,7 @@ request.interceptors.response.use((response) => {
       // 新增：处理可能是加密JSON的二进制响应
       if (contentType.includes('application/json')) {
         console.log('检测到加密JSON二进制响应');
-        return new Promise((resolve, reject) => {
+        return new Promise((resolve) => {
           const reader = new FileReader();
           reader.onload = () => {
             try {

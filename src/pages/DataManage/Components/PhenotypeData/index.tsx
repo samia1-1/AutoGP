@@ -3,7 +3,7 @@ import './index.scss';
 import { LoadingOutlined } from '@ant-design/icons';
 import { useEffect, useState, useRef } from 'react';
 import { Empty, message, Spin, Pagination } from 'antd';
-import { getPhenotypeDataAPI, getVideoOrObjAPI } from '@/apis';
+import { getPhenotypeDataAPI } from '@/apis';
 import { getToken, tokenLoss } from '@/utils';
 import { useLocation } from 'react-router-dom';
 import UploadVideo from '@/components/UploadVideo';
@@ -82,51 +82,25 @@ const PhenotypeData = ({ dataKey = "data" }) => {
     };
   }, [resData, currentPage]);
 
-  // 在视频处理部分添加错误处理和替代方案支持
   const loadVideo = async (videoPath, plantId) => {
     try {
-      console.log(`🎬 加载视频 [ID:${plantId}], 路径: ${videoPath}`);
-      console.time(`视频加载时间-${plantId}`);
-      
-      const videoResult = await getVideoOrObjAPI(videoPath);
-      console.timeEnd(`视频加载时间-${plantId}`);
-      
-      // 检查是否需要使用直接URL加载方式(处理416错误)
-      if (videoResult.error && videoResult.useDirectUrl) {
-        console.log(`🔄 使用直接URL加载视频 [ID:${plantId}]`);
-        // 使用代理URL直接加载视频
-        const directUrl = videoResult.directUrl;
-        
-        // 确保视频元素可以使用直接URL播放
-        setVideoUrls(prevState => ({ 
-          ...prevState, 
-          [plantId]: {
-            url: directUrl,
-            direct: true, // 标记为直接URL
-            token: getToken()
-          }
-        }));
-        return;
+      const response = await fetch(`http://218.199.69.63:39600/corn/download?filePath=${videoPath}`, {
+        method: 'GET',
+        headers: {
+          token: getToken(),
+        },
+      });
+      console.log(response);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
       }
-      
-      // 常规方式加载的视频
-      if (videoResult.blob && videoResult.url) {
-        console.log(`✅ 视频 [ID:${plantId}] 加载成功, 大小: ${videoResult.size} 字节`);
-        setVideoUrls(prevState => ({ 
-          ...prevState, 
-          [plantId]: {
-            url: videoResult.url,
-            direct: false
-          }
-        }));
-      }
+
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      setVideoUrls(prevState => ({ ...prevState, [plantId]: url }));
+
     } catch (error) {
-      console.error(`❌ 视频 [ID:${plantId}] 加载失败:`, error);
-      // 将视频标记为加载失败
-      setVideoUrls(prevState => ({ 
-        ...prevState, 
-        [plantId]: { error: true, message: error.message } 
-      }));
+      console.error(error)
     }
   };
 
@@ -161,31 +135,11 @@ const PhenotypeData = ({ dataKey = "data" }) => {
               data-plant-id={item.plantId}
             >
               {videoUrls[item.plantId] ? (
-                videoUrls[item.plantId].error ? (
-                  // 显示错误信息
-                  <div className="video-error">
-                    <p>视频加载失败</p>
-                    <small>{videoUrls[item.plantId].message}</small>
-                  </div>
-                ) : videoUrls[item.plantId].direct ? (
-                  // 使用带有认证token的视频标签直接加载
-                  <video 
-                    controls
-                    crossOrigin="anonymous"
-                    preload="metadata"
-                    src={`${videoUrls[item.plantId].url}&token=${videoUrls[item.plantId].token}`}
-                    onError={(e) => console.error(`视频直接加载失败 [ID:${item.plantId}]:`, e)}
-                  ></video>
-                ) : (
-                  // 使用Blob URL加载
-                  <video
-                    src={videoUrls[item.plantId].url}
-                    controls
-                    preload="metadata"
-                  ></video>
-                )
+                <video
+                  src={videoUrls[item.plantId]}
+                  controls
+                ></video>
               ) : (
-                // 加载中状态
                 <div>
                   <Spin indicator={<LoadingOutlined spin />} size="large" />
                 </div>

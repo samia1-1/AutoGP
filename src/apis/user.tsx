@@ -29,7 +29,7 @@ function registerAPI(registerData) {
     .catch(error => {
       throw error;
     })
-};
+}
 // 发送验证码
 function getCodeAPI(email) {
   console.log(email);
