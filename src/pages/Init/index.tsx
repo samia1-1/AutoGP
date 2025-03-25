@@ -1,6 +1,6 @@
 import { Button, message, Modal } from "antd"
 import { startTransition, useEffect, useState, } from "react";
-import { CarryOutOutlined } from '@ant-design/icons'
+// import { CarryOutOutlined } from '@ant-design/icons'
 import { useNavigate } from "react-router-dom";
 import { removeToken } from "@/utils";
 import './index.scss'
@@ -9,7 +9,7 @@ import { getUserInfoAPI } from "@/apis";
 const Init = () => {
 
   const { t } = useTranslation();
-  const [username,setUsername] = useState(localStorage.getItem("username"));
+  const [username, setUsername] = useState(localStorage.getItem("username"));
 
   const navigate = useNavigate();
 
@@ -23,23 +23,23 @@ const Init = () => {
     // } else {
     //   message.error("You are not logged in yet, please log in first!")
     // }
-    
+
     navigate('/app/select/train');
   }
-  const toCorn = () => {
-    // if (username !== null) {
-    //   // 使用 startTransition 包裹 navigate，优化导航行为
-    //   // startTransition(() => {
-    //   //   navigate('/corn_intelligent_management_platform');
-    //   // });
-    //   window.open('/cimp', '_black')
-    // } else {
-    //   // message.error("You are not logged in yet, please log in first!")
-    // }
+  // const toCorn = () => {
+  //   // if (username !== null) {
+  //   //   // 使用 startTransition 包裹 navigate，优化导航行为
+  //   //   // startTransition(() => {
+  //   //   //   navigate('/corn_intelligent_management_platform');
+  //   //   // });
+  //   //   window.open('/cimp', '_black')
+  //   // } else {
+  //   //   // message.error("You are not logged in yet, please log in first!")
+  //   // }
 
-    
-    window.open('/cimp', '_black')
-  }
+
+  //   window.open('/cimp', '_black')
+  // }
 
   const loginOrRegister = (route) => {
     startTransition(() => {
@@ -71,7 +71,7 @@ const Init = () => {
   };
 
   // 判断token是否失效
-  useEffect(()=>{
+  useEffect(() => {
     console.log()
     async function getData() {
       try {
@@ -85,7 +85,7 @@ const Init = () => {
       }
     }
     getData();
-  },[])
+  }, [])
   return (
     <div className="init">
       <div className="header">
@@ -106,12 +106,12 @@ const Init = () => {
           AutoGP
         </div>
         <div className="content">
-        We present the development of an intelligent breeding platform named AutoGP (http://autogp.hzau.edu.cn),
-        which integrates genotype extraction, phenotypic extraction, and GS models of genotype-to-phenotype within a user-friendly web interface.
-        AutoGP has three main advantages over previously developed platforms: 
-        (1) we designed an efficient sequencing chip to identify high-quality, high-confidence SNPs throughout gene regulatory networks; 
-        (2) we developed a complete workflow for plant phenotypic extraction (such as plant height and leaf count) from smartphone-captured video; 
-        (3) we provided a broad model pool, allowing users to select from five ML models (SVM, XGBoost, GBDT, MLP, and RF) and four commonly used DL models (DeepGS, DLGWAS, DNNGP, and SoyDNGP).
+          We present the development of an intelligent breeding platform named AutoGP (http://autogp.hzau.edu.cn),
+          which integrates genotype extraction, phenotypic extraction, and GS models of genotype-to-phenotype within a user-friendly web interface.
+          AutoGP has three main advantages over previously developed platforms:
+          (1) we designed an efficient sequencing chip to identify high-quality, high-confidence SNPs throughout gene regulatory networks;
+          (2) we developed a complete workflow for plant phenotypic extraction (such as plant height and leaf count) from smartphone-captured video;
+          (3) we provided a broad model pool, allowing users to select from five ML models (SVM, XGBoost, GBDT, MLP, and RF) and four commonly used DL models (DeepGS, DLGWAS, DNNGP, and SoyDNGP).
         </div>
         <div className="begin">
           <Button
@@ -136,11 +136,18 @@ const Init = () => {
             <div className="label">Genomic Selection</div>
           </div>
         </div>
+        <div className="help">
+          <div className="pdf">
+            <a href="/pdfs/AutoGP帮助文档.pdf" target="_blank" rel="noopener noreferrer">
+              <span style={{ fontSize: "15px", color: "white" }}>中文帮助文档</span>
+            </a>
+            <a href="/pdfs/AutoGP help documentation.pdf" target="_blank" rel="noopener noreferrer">
+              <span style={{ fontSize: "15px", color: "white" }}>English help document</span>
+            </a>
+          </div>
+        </div>
       </div>
-      <div className="main_fun">
-      </div>
-      <div className="corn_container">
-
+      {/* <div className="corn_container">
         <div className="corn">
           <div className="middle">
             <div className="left">
@@ -164,8 +171,8 @@ const Init = () => {
           </div>
           <Button className="corn_button" onClick={toCorn}>View details</Button>
         </div>
-      </div>
-      <div className="help">
+      </div> */}
+      {/* <div className="help">
         <div className="pdf">
           <a href="/pdfs/AutoGP帮助文档.pdf" target="_blank" rel="noopener noreferrer">
             中文帮助文档
@@ -174,7 +181,7 @@ const Init = () => {
             English help document
           </a>
         </div>
-      </div>
+      </div> */}
       <div className="footer">
         <div className="footer_box quick_access">
           <div className="title fast">Quick Access</div>
