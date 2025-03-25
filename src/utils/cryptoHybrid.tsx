@@ -1,7 +1,5 @@
 import CryptoJS from 'crypto-js';
 import JSEncrypt from 'jsencrypt';
-import encryptLong from 'encryptlong';
-
 
 // 配置和状态对象
 let config = {
@@ -29,19 +27,31 @@ const log = (message: string, ...args: any[]) => {
 };
 
 /**
- * 生成一个16字节的随机AES对称密钥
+ * 生成一个16位（字符）的AES对称密钥
+ * 注意：必须确保密钥长度为16位字符
  */
 export const generateSymmetricKey = (): string => {
   // 如果配置为使用固定密钥，则返回固定值
   if (config.useFixedKey && config.fixedKey) {
-    log('使用固定密钥:', config.fixedKey);
-    return config.fixedKey;
+    // 确保固定密钥也是16位
+    const fixedKey = config.fixedKey.length === 16 ? 
+      config.fixedKey : config.fixedKey.substring(0, 16);
+    log('使用固定密钥:', fixedKey);
+    return fixedKey;
   }
   
-  // 否则生成随机密钥
-  const randomKey = CryptoJS.lib.WordArray.random(16).toString(CryptoJS.enc.Hex);
-  log('生成新的随机密钥:', randomKey);
-  return randomKey;
+  // 生成包含16个随机字符的字符串
+  // 使用字母和数字的组合
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+  let result = '';
+  
+  // 生成16位随机字符串
+  for (let i = 0; i < 16; i++) {
+    result += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  
+  log('生成新的16位随机密钥:', result);
+  return result;
 };
 
 /**
@@ -75,19 +85,22 @@ export const base64ToUtf8 = (base64: string): string => {
 };
 
 /**
- * 格式化公钥为标准PEM格式
+ * 将密钥转换为标准PEM格式
+ * @param rawKey Base64编码的密钥
+ * @param type 密钥类型，如 'PUBLIC KEY' 或 'PRIVATE KEY'
+ * @returns 标准PEM格式的密钥
  */
-export const formatRSAPublicKey = (publicKey: string): string => {
+export const formatToPEM = (rawKey: string, type: 'PUBLIC KEY' | 'PRIVATE KEY' | 'RSA PRIVATE KEY' = 'PUBLIC KEY'): string => {
   try {
-    if (!publicKey) return '';
+    if (!rawKey) return '';
     
     // 如果已经是PEM格式，直接返回
-    if (publicKey.includes('-----BEGIN PUBLIC KEY-----')) {
-      return publicKey;
+    if (rawKey.includes(`-----BEGIN ${type}-----`)) {
+      return rawKey;
     }
     
     // 清理可能的空格和换行符
-    const cleanKey = publicKey.trim().replace(/\s+/g, '');
+    const cleanKey = rawKey.trim().replace(/\s+/g, '');
     
     // 每64个字符添加换行符
     const chunks = [];
@@ -95,25 +108,25 @@ export const formatRSAPublicKey = (publicKey: string): string => {
       chunks.push(cleanKey.slice(i, i + 64));
     }
     
-    const formattedKey = `-----BEGIN PUBLIC KEY-----\n${chunks.join('\n')}\n-----END PUBLIC KEY-----`;
-    log('公钥格式化完成');
+    const formattedKey = `-----BEGIN ${type}-----\n${chunks.join('\n')}\n-----END ${type}-----`;
+    log('密钥格式化完成:', type);
     return formattedKey;
   } catch (error) {
-    console.error('公钥格式化失败:', error);
+    console.error(`${type}格式化失败:`, error);
     return '';
   }
 };
 
 /**
  * 利用RSA公钥对字符串进行加密
- * 注意：这里需要传入已经编码好的字符串，如Base64格式的AES密钥
+ * 修改：现在直接加密UTF-8格式的字符串，无需Base64预处理
  */
 export const encryptWithRSA = (data: string, publicKey: string): string => {
   try {
     log('RSA加密开始，数据长度:', data.length);
     
     // 格式化公钥
-    const formattedPublicKey = formatRSAPublicKey(publicKey);
+    const formattedPublicKey = formatToPEM(publicKey, 'PUBLIC KEY');
     if (!formattedPublicKey) {
       throw new Error('公钥格式无效');
     }
@@ -122,7 +135,7 @@ export const encryptWithRSA = (data: string, publicKey: string): string => {
     const jsEncrypt = new JSEncrypt();
     jsEncrypt.setPublicKey(formattedPublicKey);
     
-    // 执行加密操作
+    // 执行加密操作 - 直接加密字符串，不进行Base64编码
     const encrypted = jsEncrypt.encrypt(data);
     
     if (!encrypted) {
@@ -180,54 +193,53 @@ export const aesEncrypt = (data: any, key: string): string => {
 export const aesDecrypt = (ciphertext: string, key: string): {success: boolean; data?: any; error?: string} => {
   try {
     log('AES解密开始');
-    
-    // 确保密钥格式正确
     const keyBytes = CryptoJS.enc.Utf8.parse(key);
-    
-    // 解密
     const decrypted = CryptoJS.AES.decrypt(ciphertext, keyBytes, {
       mode: CryptoJS.mode.ECB,
       padding: CryptoJS.pad.Pkcs7
     });
-    
-    // 转换为UTF-8字符串
     const decryptedString = decrypted.toString(CryptoJS.enc.Utf8);
     
     if (!decryptedString) {
-      return {
-        success: false,
-        error: '解密结果为空'
-      };
+      return { success: false, error: '解密结果为空' };
     }
     
-    // 尝试解析JSON
-    try {
-      const parsedData = JSON.parse(decryptedString);
-      log('AES解密完成(JSON)');
-      return {
-        success: true,
-        data: parsedData
-      };
-    } catch (e) {
-      // 不是JSON，直接返回字符串
-      log('AES解密完成(非JSON)');
-      return {
-        success: true,
-        data: decryptedString
-      };
+    let resultData: any = decryptedString;
+    
+    // 如果解密后字符串以引号包裹，则尝试先解除外层引号再解析
+    if (resultData.startsWith('"') && resultData.endsWith('"')) {
+      try {
+        const unescaped = JSON.parse(resultData);
+        // 如果解除后又是JSON格式的字符串，尝试再次解析
+        if (typeof unescaped === 'string' && unescaped.trim().startsWith('{') && unescaped.trim().endsWith('}')) {
+          resultData = JSON.parse(unescaped);
+        } else {
+          resultData = unescaped;
+        }
+      } catch (e) {
+        // 解析失败则保留原始结果
+      }
+    } else {
+      // 尝试解析为JSON对象
+      try {
+        resultData = JSON.parse(resultData);
+      } catch (e) {
+        // 如果解析失败，则认为结果为普通字符串
+      }
     }
-  } catch (error) {
+    
+    log('AES解密完成', resultData);
+    return { success: true, data: resultData };
+  } catch (error: any) {
     console.error('AES解密失败:', error);
-    return {
-      success: false,
-      error: error.message
-    };
+    return { success: false, error: error.message || '未知错误' };
   }
 };
 
 /**
  * 准备加密的请求数据
  * 结合RSA和AES加密方式，返回加密后的结果
+ * 修改：直接使用RSA加密AES密钥，无需Base64编码
  */
 export const prepareEncryptedData = (data: any, publicKey: string, sessionKey?: string): {encryptedAESKey: string; encryptedData: string; sessionKey: string} => {
   try {
@@ -239,12 +251,8 @@ export const prepareEncryptedData = (data: any, publicKey: string, sessionKey?: 
     const encryptedData = aesEncrypt(data, aesKey);
     log('数据加密完成');
     
-    // 3. 把AES密钥转为Base64，再使用RSA公钥加密
-    // 重要：这里明确转为Base64，然后再加密
-    const base64Key = utf8ToBase64(aesKey);
-    log('AES密钥转为Base64:', base64Key);
-    
-    const encryptedAESKey = encryptWithRSA(base64Key, publicKey);
+    // 3. 直接使用RSA公钥加密AES密钥
+    const encryptedAESKey = encryptWithRSA(aesKey, publicKey);
     log('RSA加密AES密钥完成');
     
     return {
@@ -266,7 +274,8 @@ const CryptoHybrid = {
   // 密钥相关
   keys: {
     generateSymmetricKey,
-    encryptWithRSA
+    encryptWithRSA,
+    formatToPEM
   },
   
   // AES加密相关
@@ -279,7 +288,7 @@ const CryptoHybrid = {
   common: {
     utf8ToBase64,
     base64ToUtf8,
-    formatRSAPublicKey
+    formatToPEM
   },
   
   // 混合加密
@@ -287,6 +296,16 @@ const CryptoHybrid = {
     prepareEncryptedData
   }
 };
+
+// 为了保持向后兼容，添加这些属性
+Object.defineProperties(CryptoHybrid, {
+  // 直接在顶层添加常用方法，简化调用
+  formatRSAPublicKey: {
+    value: formatToPEM,
+    enumerable: true
+  },
+  // 其他可能需要顶层访问的函数也可以这样添加...
+});
 
 // 导出为默认导出
 export default CryptoHybrid;

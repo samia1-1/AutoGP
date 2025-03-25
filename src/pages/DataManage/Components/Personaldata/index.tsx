@@ -38,27 +38,64 @@ const Personaldata = ({ dataKey = "data" }) => {
     console.log(dataKey);
 
     async function getData() {
-      const data = (await getPersonalFileAPI()).data;
-      if (data.code === 200) {
-        console.log('Data:', data);
-        console.log(data.data);
-        setRecords(
-          data.data.map(record => ({
-            ...record,
-            createTime: record.createTime ? record.createTime.slice(0, 10) : ''
-          }))
-        )
-      } else if (data.code == 401) {
-        if (dataKey === "data") {
-          tokenLoss(pathname);
+      try {
+        const data = (await getPersonalFileAPI()).data;
+        if (data.code === 200) {
+          console.log('Data:', data);
+          console.log(data.data);
+          setRecords(
+            data.data.map(record => ({
+              ...record,
+              createTime: formatCreateTime(record.createTime)
+            }))
+          )
+        } else if (data.code == 401) {
+          if (dataKey === "data") {
+            tokenLoss(pathname);
+          }
+        } else {
+          message.error(data.msg)
         }
-      } else {
-        message.error(data.msg)
+      } catch (error) {
+        console.error('Failed to get personal file:', error);
+        message.error(t("Failed to get data"));
       }
-
     }
     getData()
   }, [refreshData])
+
+  /**
+   * 安全格式化创建时间
+   * @param createTime 创建时间（可能是字符串、Date对象、数字或undefined等）
+   * @returns 格式化后的日期字符串
+   */
+  const formatCreateTime = (createTime: any): string => {
+    // 如果为空值，直接返回空字符串
+    if (!createTime) return '';
+    
+    try {
+      // 如果是字符串类型
+      if (typeof createTime === 'string') {
+        return createTime.slice(0, 10); // 只取前10个字符
+      }
+      
+      // 如果是Date对象
+      if (createTime instanceof Date) {
+        return createTime.toISOString().slice(0, 10);
+      }
+      
+      // 如果是数字（时间戳）
+      if (typeof createTime === 'number') {
+        return new Date(createTime).toISOString().slice(0, 10);
+      }
+      
+      // 其他情况，转换为字符串
+      return String(createTime).slice(0, 10);
+    } catch (error) {
+      console.error('Error formatting date:', createTime, error);
+      return ''; // 错误情况返回空字符串
+    }
+  };
 
   // 下载文件
   const handleDownload = async (fileName: string) => {
